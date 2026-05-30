@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "vt",
+  "displayName": "Vibe Table",
+  "version": "0.5.1",
+  "description": "Personal orientation layer for solo operators: story-state kanban + daily/weekly priorities + surfaced drift, enforced by a SessionStart sentinel and a PreToolUse hard gate (focus-staleness blocks product-surface writes until the daily/weekly reconciliation runs). Operates on whatever workspace it is enabled in.",
+  "author": {
+    "name": "idnk2203",
+    "url": "https://github.com/idnk2203"
+  },
+  "homepage": "https://github.com/idnk2203/vibe-table",
+  "repository": "https://github.com/idnk2203/vibe-table",
+  "license": "MIT",
+  "keywords": [
+    "workflow",
+    "kanban",
+    "productivity",
+    "story-driven",
+    "operator-loop",
+    "sentinel"
+  ],
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/sentinel.sh\""
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/vt-gate.sh\""
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/vt-bash-gate.sh\""
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/vt-prompt-gate.sh\""
+          }
+        ]
+      }
+    ]
+  }
+}

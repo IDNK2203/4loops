@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-marketplace.json",
+  "name": "bls-vibe-table",
+  "owner": {
+    "name": "idnk2203",
+    "url": "https://github.com/idnk2203"
+  },
+  "description": "Local marketplace hosting vibe-table during P0 dogfooding. Relocates to a public GitHub marketplace at ship.",
+  "plugins": [
+    {
+      "name": "vt",
+      "source": "./plugin",
+      "description": "Personal orientation layer: story-state kanban + daily/weekly priorities + surfaced drift, enforced by a SessionStart sentinel and a PreToolUse hard gate.",
+      "version": "0.5.1",
+      "author": {
+        "name": "idnk2203"
+      }
+    }
+  ]
+}

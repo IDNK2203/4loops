@@ -1,0 +1,139 @@
+#!/usr/bin/env bash
+# Vibe Table mechanical regression suite. Repo-relative; run from anywhere:
+#   bash tests/run.sh
+# Covers the headline behaviors + regressions for the bugs found in the
+# 2026-05-29 battle-test fan-out. The LIVE behaviors (does CC honor a plugin
+# PreToolUse deny, AskUserQuestion render, version-cache, SessionStart cwd) are
+# NOT here — they're the live walkthrough in DOGFOOD-PLAN.md.
+set -uo pipefail
+
+PLUGIN="$(cd "$(dirname "$0")/../plugin" && pwd)"
+S="$PLUGIN/scripts"; H="$PLUGIN/hooks"
+P=0; F=0
+ok(){ P=$((P+1)); printf '  PASS  %s\n' "$1"; }
+no(){ F=$((F+1)); printf '  FAIL  %s\n' "$1"; [ -n "${2:-}" ] && printf '        %s\n' "$2"; return 0; }
+ck(){ if eval "$2"; then ok "$1"; else no "$1" "${3:-}"; fi; }
+
+TODAY=$(date +%F); WK=$(date +%V)
+D10=$(date -v-10d +%F 2>/dev/null || date -d '10 days ago' +%F)
+D30=$(date -v-30d +%F 2>/dev/null || date -d '30 days ago' +%F)
+
+mkboard(){ # $1=VT_DIR ; writes a minimal valid board + dirs
+  mkdir -p "$1/.cleared" "$1/archive"
+  cat > "$1/board.md" <<EOF
+# Vibe Table
+
+**Counts:** Backlog 0 · Planning 0 · In Progress 0 · Testing 0 · Done 0
+
+## Projects
+
+| Key | Project | Repo |
+| --- | ------- | ---- |
+| P0 | dev-os | — |
+
+---
+
+| Backlog | Planning | In Progress | Testing | Done |
+| ------- | -------- | ----------- | ------- | ---- |
+EOF
+}
+
+echo "════ 1. Gate guard (PreToolUse) ════"
+W=$(mktemp -d); VT="$W/.vibe-table"; mkboard "$VT"; : > "$VT/.armed"; : > "$VT/transitions.log"
+mkdir -p "$W/projects/p0/content" "$W/projects/p0/study" "$W/src"; printf '# x\n' > "$W/README.md"
+pj(){ printf '{"session_id":"%s","cwd":"%s","tool_input":{"file_path":"%s"}}' "$1" "$W" "$2"; }
+gate(){ printf '%s' "$1" | bash "$H/vt-gate.sh" 2>&1; }   # echoes deny JSON or nothing
+isdeny(){ printf '%s' "$1" | grep -q '"permissionDecision"[[:space:]]*:[[:space:]]*"deny"'; }
+# stale (no priorities file)
+ck "block: stale + gated"        'O=$(gate "$(pj S1 "$W/projects/p0/content/a.md")"); isdeny "$O"'
+ck "allow: exempt study/"        'O=$(gate "$(pj S1 "$W/projects/p0/study/n.md")"); ! isdeny "$O"'
+ck "allow: exempt root *.md"     'O=$(gate "$(pj S1 "$W/README.md")"); ! isdeny "$O"'
+ck "allow: exempt .vibe-table/"  'O=$(gate "$(pj S1 "$W/.vibe-table/board.md")"); ! isdeny "$O"'
+ck "allow: non-gated src/"       'O=$(gate "$(pj S1 "$W/src/x.js")"); ! isdeny "$O"'
+: > "$VT/.cleared/S2"
+ck "allow: cleared session"      'O=$(gate "$(pj S2 "$W/projects/p0/content/a.md")"); ! isdeny "$O"'
+ck "allow: env override + log"   'O=$(VT_ALLOW_STALE_GATE=1 gate "$(pj S3 "$W/projects/p0/content/a.md")"); ! isdeny "$O" && grep -q VT_ALLOW_STALE_GATE "$VT/override.log"'
+rm -f "$VT/.armed"
+ck "allow: on-ramp (unarmed)"    'O=$(gate "$(pj S4 "$W/projects/p0/content/a.md")"); ! isdeny "$O"'
+
+echo "════ 2. Regression: bugs from the 2026-05-29 fan-out ════"
+W2=$(mktemp -d); VT="$W2/.vibe-table"; mkboard "$VT"
+export VT_DIR="$VT"; BOARD="$VT/board.md"; TRANSITIONS="$VT/transitions.log"; PRIORITIES="$VT/current-priorities.md"
+# shellcheck source=/dev/null
+source "$S/vt-priorities-lib.sh"; source "$S/vt-drift-lib.sh"
+# board with three in-progress stories: P0-100 (focused, stale), P0-101 (stale),
+# P0-102 (no transition-log entry)
+cat > "$BOARD" <<EOF
+# Vibe Table
+
+**Counts:** Backlog 0 · Planning 0 · In Progress 3 · Testing 0 · Done 0
+
+## Projects
+
+| Key | Project | Repo |
+| --- | ------- | ---- |
+| P0 | dev-os | — |
+
+---
+
+| Backlog | Planning | In Progress | Testing | Done |
+| ------- | -------- | ----------- | ------- | ---- |
+|  |  | [P0] **P0-100** focused stale |  |  |
+|  |  | [P0] **P0-101** logged stale |  |  |
+|  |  | [P0] **P0-102** no-log story |  |  |
+EOF
+# P0-100 + P0-101 have transitions 30d ago; P0-102 has NO log entry
+printf '%sT10:00:00Z\tP0-100\tplanning→in-progress\n%sT10:00:00Z\tP0-101\tplanning→in-progress\n' "$D30" "$D30" > "$TRANSITIONS"
+# focus = P0-100 (today)
+printf '# Current Priorities — w\n\n## Today (%s)\nFocus: P0-100\n\n## Week %s (r)\nFocus: P0-100\n' "$TODAY" "$WK" > "$PRIORITIES"
+AB=$(find_abandoned 21)
+ck "find_abandoned: spares FOCUSED story"     '! printf "%s" "$AB" | grep -q P0-100'
+ck "find_abandoned: flags non-focus stale"    'printf "%s" "$AB" | grep -q P0-101'
+ck "find_abandoned: skips NO-LOG story"        '! printf "%s" "$AB" | grep -q P0-102'
+ST=$(find_stale 14)
+ck "find_stale: skips NO-LOG story"            '! printf "%s" "$ST" | grep -q P0-102'
+ck "find_stale: flags logged stale"            'printf "%s" "$ST" | grep -q P0-101'
+# week-stamp padding (simulate ISO week 05 via override)
+iso_week_num(){ echo "05"; }
+ck "week_stamp_current: 5 == 05 (padding)"     'week_stamp_current "5"'
+ck "week_stamp_current: 05 == 05"              'week_stamp_current "05"'
+ck "week_stamp_current: 6 != 05"               '! week_stamp_current "6"'
+ck "week_stamp_current: empty → not current"   '! week_stamp_current ""'
+source "$S/vt-priorities-lib.sh"   # restore the real iso_week_num (override above was a stub)
+# weekly_rollover must NOT archive the focused or no-log story
+weekly_rollover >/dev/null 2>&1
+M=$(date +%Y-%m)
+ck "rollover: focused P0-100 stays on board"   'grep -q P0-100 "$BOARD"'
+ck "rollover: no-log P0-102 stays on board"    'grep -q P0-102 "$BOARD"'
+ck "rollover: stale P0-101 archived"           'grep -q P0-101 "$VT/archive/$M/abandoned.md" 2>/dev/null && ! grep -q P0-101 "$BOARD"'
+# each ritual freshens ONLY its own stamp (week-alone must NOT clear the day gate)
+rm -f "$PRIORITIES"
+write_focus_section week "P0-100"
+ck "ritual: /week leaves Today STALE"          '[ -z "$(read_today_stamp)" ]'
+ck "ritual: /week sets Week current"           'week_stamp_current "$(read_week_stamp)"'
+write_focus_section today "P0-100"
+ck "ritual: /today PRESERVES Week stamp"        'week_stamp_current "$(read_week_stamp)"'
+ck "ritual: /today sets Today current"          '[ "$(read_today_stamp)" = "$(iso_today)" ]'
+unset VT_DIR
+
+echo "════ 3. Sentinel render + malformed-board warn ════"
+W3=$(mktemp -d); VT="$W3/.vibe-table"; mkboard "$VT"; : > "$VT/.armed"; : > "$VT/transitions.log"
+cat >> "$VT/board.md" <<EOF
+|  |  | [P0] **P0-007** Hard gate foundation |  |  |
+EOF
+printf '%sT10:00:00Z\tP0-007\tplanning→in-progress\n' "$D10" >> "$VT/transitions.log"
+printf '# Current Priorities — w\n\n## Today (%s)\nFocus: P0-007\n\n## Week %s (r)\nFocus: P0-007\n' "$TODAY" "$WK" > "$VT/current-priorities.md"
+SOUT=$(cd "$W3" && printf '{"session_id":"SR","source":"startup"}' | bash "$H/sentinel.sh" 2>/dev/null)
+ck "sentinel: valid JSON"            'printf "%s" "$SOUT" | jq -e . >/dev/null 2>&1'
+C=$(printf '%s' "$SOUT" | jq -r '.hookSpecificOutput.additionalContext')
+ck "sentinel: renders task w/ title" 'printf "%s" "$C" | grep -q "P0-007  Hard gate foundation"'
+ck "sentinel: · header"              'printf "%s" "$C" | grep -q "Vibe Table · "'
+# break the separator → malformed warn
+sed -i.bak 's/^| ------- | -------- | ----------- | ------- | ---- |$/| - | - | - | - | - |/' "$VT/board.md" && rm -f "$VT/board.md.bak"
+SOUT2=$(cd "$W3" && printf '{"session_id":"SR2","source":"startup"}' | bash "$H/sentinel.sh" 2>/dev/null)
+C2=$(printf '%s' "$SOUT2" | jq -r '.hookSpecificOutput.additionalContext' 2>/dev/null)
+ck "sentinel: malformed-board WARN"  'printf "%s" "$C2" | grep -q "\[WARN\] board.md looks malformed"'
+
+echo
+echo "════ RESULT: $P passed, $F failed ════"
+[ "$F" -eq 0 ]
