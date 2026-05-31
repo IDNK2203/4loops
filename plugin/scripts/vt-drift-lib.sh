@@ -25,7 +25,7 @@ board_rows() {
           id=""
           if (match(c, /\*\*[A-Za-z0-9]+-[0-9]+\*\*/)) id=substr(c, RSTART+2, RLENGTH-4)
           print id "\t" st[i-1] "\t" c
-          break
+          # no break: dense rows hold a story per column, emit them all
         }
       }
     }
@@ -151,18 +151,38 @@ $ids
 EOF
 }
 
-# Delete the rows for the given story IDs from the board.
-# IDs may arrive newline- or space-separated; flatten to spaces (awk -v cannot
-# carry a literal newline — "newline in string").
+# Remove the given story IDs from the board and re-grid densely. Dense storage
+# packs many stories per row, so we drop the matching CELLS (not whole rows,
+# which would take co-located stories with them) and rebuild the grid.
+# IDs may arrive newline- or space-separated; flatten to spaces.
 _remove_board_rows() {
   local ids tmp
   ids=$(printf '%s' "$1" | tr '\n' ' ')
   [ -z "${ids// /}" ] && return 0
   tmp="${BOARD}.tmp"
-  awk -v ids="$ids" '
-    BEGIN { n=split(ids, a, /[ ]+/); for (i=1;i<=n;i++) if (a[i]!="") want[a[i]]=1 }
-    /^\|/ { for (id in want) if (index($0, "**" id "**")) next }
-    { print }
+  awk -v exclude=" $ids " '
+    function excluded(c,   id) {
+      if (match(c, /\*\*[A-Za-z0-9]+-[0-9]+\*\*/)) {
+        id = substr(c, RSTART+2, RLENGTH-4)
+        return index(exclude, " " id " ") > 0
+      }
+      return 0
+    }
+    BEGIN { FS="|" }
+    /^\| Backlog \| Planning \| In Progress \| Testing \| Done \|$/ { print; hdr=1; next }
+    hdr && /^\| --/ { print; inbody=1; next }
+    inbody && /^\|/ {
+      for (i=2;i<=6;i++){ c=$i; gsub(/^ +| +$/,"",c);
+        if (c!="" && !excluded(c)) cells[i-1, ++n[i-1]]=c }
+      next
+    }
+    !inbody { print }
+    END {
+      rows=0; for (col=1;col<=5;col++) if (n[col]>rows) rows=n[col]
+      for (i=1;i<=rows;i++){ line="|";
+        for (col=1;col<=5;col++){ c=(i<=n[col])?cells[col,i]:""; line=line " " c " |" }
+        print line }
+    }
   ' "$BOARD" > "$tmp" && mv "$tmp" "$BOARD"
 }
 

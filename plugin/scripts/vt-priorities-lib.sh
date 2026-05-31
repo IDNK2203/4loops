@@ -39,7 +39,7 @@ story_state() {
       for (i = 2; i <= 6; i++) {
         cell = $i
         gsub(/^ +| +$/, "", cell)
-        if (cell != "") {
+        if (index(cell, "**" id "**")) {
           states[1] = "backlog"; states[2] = "planning"; states[3] = "in-progress"
           states[4] = "testing"; states[5] = "done"
           print states[i-1]

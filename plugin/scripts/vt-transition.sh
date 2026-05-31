@@ -35,7 +35,7 @@ RESULT=$(awk -v id="$ID" -F'|' '
     for (i = 2; i <= 6; i++) {
       cell = $i
       gsub(/^ +| +$/, "", cell)
-      if (cell != "") {
+      if (index(cell, "**" id "**")) {
         print (i - 1) "|" cell
         exit
       }
@@ -62,20 +62,35 @@ if [ "$OLD_COL" = "$NEW_COL" ]; then
   echo "${ID} already in ${NEW_STATE}" >&2; exit 0
 fi
 
-# Build new row with content moved to NEW_COL
-NEW_ROW="|"
-for i in 1 2 3 4 5; do
-  if [ "$i" = "$NEW_COL" ]; then
-    NEW_ROW="${NEW_ROW} ${CONTENT} |"
-  else
-    NEW_ROW="${NEW_ROW}  |"
-  fi
-done
-
-# Replace the old row with the new row
-awk -v id="$ID" -v new_row="$NEW_ROW" '
-  /^\|/ && index($0, "**" id "**") { print new_row; next }
-  { print }
+# Rebuild the board as a DENSE grid, moving ID's cell to NEW_COL. Co-located
+# stories on ID's row are preserved (dense storage = many stories per row), so we
+# can't just replace the row — we re-grid the whole body.
+awk -v id="$ID" -v newcol="$NEW_COL" '
+  BEGIN { FS = "|" }
+  /^\| Backlog \| Planning \| In Progress \| Testing \| Done \|$/ { print; hdr = 1; next }
+  hdr && /^\| --/ { print; inbody = 1; next }
+  inbody && /^\|/ {
+    for (i = 2; i <= 6; i++) {
+      c = $i; gsub(/^ +| +$/, "", c)
+      if (c == "") continue
+      col = (index(c, "**" id "**") > 0) ? newcol : (i - 1)
+      cells[col, ++n[col]] = c
+    }
+    next
+  }
+  !inbody { print }
+  END {
+    rows = 0
+    for (col = 1; col <= 5; col++) if (n[col] > rows) rows = n[col]
+    for (i = 1; i <= rows; i++) {
+      line = "|"
+      for (col = 1; col <= 5; col++) {
+        c = (i <= n[col]) ? cells[col, i] : ""
+        line = line " " c " |"
+      }
+      print line
+    }
+  }
 ' "$BOARD" > "${BOARD}.tmp" && mv "${BOARD}.tmp" "$BOARD"
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"

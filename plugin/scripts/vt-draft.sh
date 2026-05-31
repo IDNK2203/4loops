@@ -57,6 +57,8 @@ fi
 NEW_ROW="| ${CELL} |  |  |  |  |"
 echo "$NEW_ROW" >> "$BOARD"
 
+# Densify: collapse the appended sparse row into the top-aligned grid.
+"$SCRIPT_DIR/vt-repack.sh"
 "$SCRIPT_DIR/vt-refresh-counts.sh"
 
 TS=$(date -u +"%Y-%m-%dT%H:%M:%SZ")

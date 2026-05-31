@@ -134,6 +134,24 @@ SOUT2=$(cd "$W3" && printf '{"session_id":"SR2","source":"startup"}' | bash "$H/
 C2=$(printf '%s' "$SOUT2" | jq -r '.hookSpecificOutput.additionalContext' 2>/dev/null)
 ck "sentinel: malformed-board WARN"  'printf "%s" "$C2" | grep -q "\[WARN\] board.md looks malformed"'
 
+echo "════ 4. Dense board storage (P0-016) ════"
+W4=$(mktemp -d); export VT_DIR="$W4/.vibe-table"
+for t in a b c d e; do bash "$S/vt-draft.sh" T "$t" >/dev/null; done
+bash "$S/vt-transition.sh" T-002 in-progress >/dev/null
+bash "$S/vt-transition.sh" T-003 testing >/dev/null
+bash "$S/vt-transition.sh" T-004 in-progress >/dev/null
+# 5 stories: backlog {T-001,T-005}, in-progress {T-002,T-004}, testing {T-003}.
+# Dense grid → 2 body rows (max column height). A staircase would be 5.
+NR=$(awk '/^\| Backlog \| Planning/{b=1;getline;next} b&&/^\|/{c++} END{print c+0}' "$VT_DIR/board.md")
+NSTORIES=$(grep -oE 'T-00[1-5]' "$VT_DIR/board.md" | wc -l | tr -d ' ')
+ck "dense: body rows = max col height (2)"       '[ '"$NR"' -eq 2 ]'
+ck "dense: all 5 stories retained (no loss)"      '[ '"$NSTORIES"' -eq 5 ]'
+source "$S/vt-priorities-lib.sh"
+ck "dense: story_state resolves co-located cell"  '[ "$(story_state T-004)" = "in-progress" ]'
+bash "$S/vt-transition.sh" T-002 done >/dev/null
+ck "dense: co-located T-004 survives T-002 move"  'grep -q T-004 "$VT_DIR/board.md"'
+unset VT_DIR
+
 echo
 echo "════ RESULT: $P passed, $F failed ════"
 [ "$F" -eq 0 ]
