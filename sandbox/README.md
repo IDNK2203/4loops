@@ -59,11 +59,14 @@ workspace/
 ## The walkthrough (seeded, isolated)
 
 1. **B3** — launch; the sentinel dashboard renders (cwd = workspace root).
-2. **B1** — ask Claude to edit `projects/acme-demo/content/post.md` → must be **denied**.
-   Then edit `study/notes.md` → **allowed**. (Drop `jq` off `PATH` to prove the `exit 2`
-   fallback also blocks.)
-3. **B2** — run `/vt:today`, then immediately edit a gated file in the **same session** →
-   must be **allowed** (the session-id handshake holds).
+2. **B1** — ask Claude to **attempt** an edit to `projects/acme-demo/content/post.md` (don't
+   let it pre-judge — make it run the Edit). The Edit tool returns the PreToolUse hook denial
+   = the rail blocking. Then edit `study/notes.md` → **allowed** (exempt). (Drop `jq` off
+   `PATH` to prove the `exit 2` fallback also blocks.) Seed files are neutral — the *path* is
+   what's gated, so the rail (not the file's text) is what denies.
+3. **B2** — a fresh board has no week stamp (new ISO week), so run `/vt:week` **then**
+   `/vt:today`. Now retry the gated edit in the **same session** → must be **allowed** (the
+   session-id handshake holds across the lift).
 4. **B5** — `/vt:today` shows the 3-group `multiSelect`; selections map back to story IDs.
 5. **B4** (`--real-install` only) — edit a hook header, bump the version in both manifests,
    `/plugin update`, `/reload-plugins`, new session → confirm the new hook runs.

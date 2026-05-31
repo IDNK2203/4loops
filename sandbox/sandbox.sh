@@ -70,22 +70,25 @@ find_sandbox() {  # <name> → echo root, or return 1
 }
 
 # ── Builders ──────────────────────────────────────────────────────────────────
-scaffold_mock() {  # <workspace> — mock tree; gated paths match vt_gated_globs defaults
-  local ws="$1"
+scaffold_mock() {  # <workspace> — realistic mock tree. Gated-ness comes from the PATH
+  local ws="$1"    # (matches vt_gated_globs defaults), NOT the content. Keep files NEUTRAL:
+                   # meta-text like "this is gated" makes the model self-refuse by reading it
+                   # instead of attempting the edit and letting the rail decide. Which paths
+                   # are gated is documented in README / the launch walk, never in the files.
   mkdir -p "$ws/projects/acme-demo/content" \
            "$ws/projects/acme-demo/repo-scaffolding" \
            "$ws/projects/acme-demo/gists" \
            "$ws/projects/acme-demo/src" \
            "$ws/study"
-  printf '# Launch post (GATED)\nEditing this while focus is stale must be DENIED by the rail (B1).\n' \
+  printf '# Launch post — draft\n\nAcme is live. What we shipped and why it matters.\n\n- intro hook\n- 3 feature highlights\n- CTA\n' \
     > "$ws/projects/acme-demo/content/post.md"
-  printf '# acme-demo (GATED) — repo scaffolding\n' \
+  printf '# acme-demo\n\nScaffolding for the acme demo project.\n' \
     > "$ws/projects/acme-demo/repo-scaffolding/README.md"
-  printf '// GATED — embeddable snippet\nconsole.log("vibe");\n' \
+  printf '// acme-demo embeddable snippet\nexport function greet(name) {\n  return `Hello, ${name}!`;\n}\n' \
     > "$ws/projects/acme-demo/gists/snippet.js"
-  printf '// NOT gated — editing this is always allowed\n' \
+  printf '// acme-demo app entrypoint\nconsole.log("acme app starting");\n' \
     > "$ws/projects/acme-demo/src/app.js"
-  printf '# Study notes — exempt research surface, writable even gate-up\n' \
+  printf '# Study notes\n\nScratch space for research and to-dos.\n' \
     > "$ws/study/notes.md"
 }
 
@@ -160,10 +163,12 @@ print_launch() {  # <root> <workspace>
     echo "Walk (virgin): confirm vt is SILENT (no .vibe-table yet) → /vt:draft a story → /vt:today."
   else
     echo "Walk:  sentinel renders (B3)"
-    echo "       · edit projects/acme-demo/content/post.md → DENIED (B1)"
-    echo "       · edit study/notes.md → allowed"
-    echo "       · /vt:today → then a same-session gated edit is allowed (B2)"
-    echo "       · /vt:today shows the 3-group multiSelect (B5)"
+    echo "       · ATTEMPT an Edit to projects/acme-demo/content/post.md (don't pre-judge it)"
+    echo "         → the Edit tool returns the PreToolUse hook denial = B1, the thesis"
+    echo "       · edit study/notes.md → allowed (exempt)"
+    echo "       · /vt:week THEN /vt:today (fresh board = new ISO week, both needed) → retry"
+    echo "         the gated edit, same session → now allowed = B2"
+    echo "       · the reconciliation shows the multiSelect groups, labels → IDs = B5"
     [ "$INSTALL" = real ] && echo "       · bump version → /plugin update → /reload-plugins → new hooks run (B4)"
   fi
 }
