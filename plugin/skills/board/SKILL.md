@@ -1,6 +1,6 @@
 ---
 name: board
-description: Render the Vibe Table board (kanban of stories by state). Default shows full board as a single horizontal 5-column table (Backlog | Planning | In Progress | Testing | Done), 5 rows per state. Slicing flags filter to a single state, a custom row cap, or a single project. Use when the user wants to see the current state of their stories.
+description: Render the Vibe Table board (kanban of stories by state). Default shows full board as a single horizontal 5-column table (Backlog | Planning | In Progress | Testing | Done), 5 rows per state, with compact cells (ID + title). Slicing flags filter to a single state (full why/context), a custom row cap, or a single project; `--list` gives a vertical view (kanban stays default). Use when the user wants to see the current state of their stories.
 allowed-tools: Bash
 user-invocable: true
 ---
@@ -16,6 +16,7 @@ Render the Vibe Table board for the current workspace.
 | `/board <state> <N>` | Single column, N rows |
 | `/board --project <P>` | Filter all displayed rows to project `<P>` |
 | `/board --all` | No per-state cap (show every row) |
+| `/board --list` | Vertical list view (state headers + bullets) instead of the kanban table |
 
 `<state>` is one of: `backlog`, `planning`, `in-progress`, `testing`, `done`.
 
@@ -39,7 +40,7 @@ Build the arg list for the script. Order doesn't matter — the script accepts s
 
 ### 3. Surface the output
 
-Print the script's stdout verbatim as the response. The board is a markdown artifact; let it render directly. Do NOT add commentary, summaries, or annotations — the board IS the message.
+Print the script's stdout **verbatim** as the response — it is a markdown artifact; let it render directly. Do NOT add commentary, summaries, or annotations, and **do NOT reflow the kanban table into a list**: the full-board cells are already compact (ID + title) so the table fits, and `/board --list` is the only list form. The board IS the message.
 
 ## Errors
 
