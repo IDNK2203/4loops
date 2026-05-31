@@ -21,7 +21,10 @@ PERSIST_BASE="$HOME/Ship/vt-sandbox"
 MARKETPLACE="bls-vibe-table"   # must match .claude-plugin/marketplace.json "name"
 
 # ── Defaults (set by parse_new_args) ────────────────────────────────────────────
-MODE=isolated
+# Default to --light: it keeps your real auth (no --bare → keychain/OAuth intact),
+# and since sandboxes live OUTSIDE ~/Ship/bls your BLS hooks don't load anyway.
+# --isolated (--bare) is hermetic but SKIPS OAuth/keychain → needs ANTHROPIC_API_KEY.
+MODE=light
 INSTALL=inject     # inject | real | "" (light)
 EMPTY=false
 NAME=""
@@ -136,12 +139,20 @@ print_launch() {  # <root> <workspace>
       ;;
     isolated/inject)
       echo "  cd \"$ws\" && claude --bare --settings \"$root/config/sandbox-settings.json\" --strict-mcp-config"
+      echo
+      echo "  ⚠  --bare SKIPS OAuth + keychain (CC docs) → a Max/Pro subscription shows"
+      echo "     'Not logged in'. Authenticate with ANTHROPIC_API_KEY (or an apiKeyHelper in"
+      echo "     the settings file). For an authenticated run with no setup, use --light."
+      [ -z "${ANTHROPIC_API_KEY:-}" ] && echo "     (ANTHROPIC_API_KEY is not set in this shell.)"
       ;;
     isolated/real)
       echo "  export HOME=\"$root/config\""
       echo "  claude plugin marketplace add \"$REPO\""
       echo "  claude plugin install vt@$MARKETPLACE"
       echo "  cd \"$ws\" && HOME=\"$root/config\" claude"
+      echo
+      echo "  ⚠  \$HOME override may not resolve the macOS login keychain → if it shows"
+      echo "     'Not logged in', run /login inside the session (one-time, into this config)."
       ;;
   esac
   echo
