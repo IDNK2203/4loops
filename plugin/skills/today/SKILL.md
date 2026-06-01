@@ -26,15 +26,18 @@ user-invocable: true
 - `vt-drift.sh` → caps hit, stale in-progress/testing, abandoned candidates (surface-only — **this is where you resolve them**).
 - `--default` → carry-forward suggestion = yesterday's focus still in planning/in-progress/testing. Save as `SUGGESTED_FOCUS`.
 
-### 2. Reconcile the board — batch multi-select (transitions happen HERE)
+### 2. Reconcile the board — granular forward transitions (state moves HERE)
 
-The heart of the ritual: make the board honest *before* setting focus, moving pieces in **batches** so it feels like a board-state selector. Build ONE `AskUserQuestion` with up to three `multiSelect: true` questions, each listing the relevant stories as options (label = `ID — title`). Omit a question whose source set is empty.
+The heart of the ritual: make the board honest *before* setting focus. Build ONE `AskUserQuestion` with up to **four** `multiSelect: true` groups — each one a single forward step along the flow `backlog → in-progress → testing → done`, plus a park escape. Omit any group whose source set is empty. Label every option `ID — title`.
 
-- **Q1 — "Which are now Done?"** options = current **Testing + In Progress** stories. Each selected → `"${CLAUDE_PLUGIN_ROOT}/scripts/vt-transition.sh" <id> done`.
-- **Q2 — "Pull into focus from Backlog?"** options = **Backlog** stories. Each selected → `"${CLAUDE_PLUGIN_ROOT}/scripts/vt-transition.sh" <id> in-progress` (what you'll work on now).
-- **Q3 — "Stale items to drop/park?"** options = the stale stories from `vt-drift.sh`. Each selected → `"${CLAUDE_PLUGIN_ROOT}/scripts/vt-transition.sh" <id> backlog` (parked).
+1. **"Starting today?"** — options = **Backlog** → `"${CLAUDE_PLUGIN_ROOT}/scripts/vt-transition.sh" <id> in-progress`
+2. **"Moved to testing?"** — options = **In Progress** → `"${CLAUDE_PLUGIN_ROOT}/scripts/vt-transition.sh" <id> testing`
+3. **"Now done?"** — options = **In Progress + Testing** → `"${CLAUDE_PLUGIN_ROOT}/scripts/vt-transition.sh" <id> done`
+4. **"Park (stale)?"** — options = stale candidates from `vt-drift.sh` → `"${CLAUDE_PLUGIN_ROOT}/scripts/vt-transition.sh" <id> backlog`
 
-Loop the transition script over each selected ID, then re-render the board. Anything not selected stays put. If all three source sets are empty, skip reconciliation silently — don't manufacture churn. (To add a brand-new item, use `/vt:draft`.)
+Each story belongs in at most one group. Apply the selected transitions in flow order (starting → testing → done → park), looping the script over each ID, then re-render the board. Anything unselected stays put. If all four source sets are empty, skip reconciliation silently — don't manufacture churn. (Brand-new item → `/vt:draft`.)
+
+Four groups is the `AskUserQuestion` max, so reconcile (here) and focus-set (step 3) stay **two** separate calls. Each question also needs **≥2 options**: if a group's source set has a single story, add a `None — leave as is` option so the call is valid; treat selecting it as a no-op.
 
 ### 3. Set today's focus (the byproduct)
 
