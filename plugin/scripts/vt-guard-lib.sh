@@ -161,8 +161,8 @@ vt_log_override() {
 # ISO week). Requires vt-priorities-lib.sh sourced (read_*_stamp / iso_*).
 vt_gate_directive() {
   local lead
-  if [ "$(read_week_stamp)" != "$(iso_week_num)" ]; then
-    lead="It's a new ISO week — run /vt:week, then /vt:today, to reconcile the board and set focus."
+  if ! week_stamp_current "$(read_week_stamp)"; then
+    lead="It's a new week — run /vt:week, then /vt:today, to reconcile the board and set focus."
   else
     lead="Today's focus is stale — run /vt:today to reconcile the board and set today's focus."
   fi

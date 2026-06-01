@@ -15,16 +15,61 @@ iso_today()      { date +"%Y-%m-%d"; }
 iso_week_num()   { date +"%V"; }
 iso_year()       { date +"%G"; }
 
-# Returns "YYYY-MM-DD → MM-DD" for the current ISO week (Mon → Sun).
+# ── Week-start config (mon default | sun) ─────────────────────────────────────
+# The first day of the week is configurable per workspace via .vibe-table/config
+# (`week-start: mon|sun`). Default is Monday (ISO). Everything that needs a week
+# boundary — the range label, the staleness number, the rollover marker — routes
+# through the helpers below so the two modes stay coherent.
+vt_week_start() {
+  local cfg="$VT_DIR/config" v=""
+  [ -f "$cfg" ] && v=$(awk -F': *' '/^week-start:/{print tolower($2); exit}' "$cfg" 2>/dev/null)
+  case "$v" in sun|sunday) echo sun ;; *) echo mon ;; esac
+}
+
+# Days to subtract from today to reach the first day of the current week.
+_week_back() {
+  local dow; dow=$(date +"%u")          # 1=Mon ... 7=Sun
+  if [ "$(vt_week_start)" = sun ]; then
+    echo $(( dow % 7 ))                  # Sun(7)→0, Mon(1)→1 ... Sat(6)→6
+  else
+    echo $(( dow - 1 ))                  # Mon(1)→0 ... Sun(7)→6
+  fi
+}
+
+# Date (YYYY-MM-DD) of the first day of the current week, honoring week-start.
+week_start_date() {
+  local back; back=$(_week_back)
+  date -v-"${back}"d +"%Y-%m-%d" 2>/dev/null || date -d "today -${back} days" +"%Y-%m-%d"
+}
+
+# Week-of-year number for the CURRENT week, honoring week-start. Mon routes
+# through iso_week_num (so test stubs of iso_week_num still apply); Sun uses the
+# Sunday-based %U. This is the number stamped into current-priorities.md and
+# compared by week_stamp_current.
+week_num_current() {
+  if [ "$(vt_week_start)" = sun ]; then date +"%U"; else iso_week_num; fi
+}
+
+# Stable per-week identity for the rollover marker. Mon keeps the exact legacy
+# "<isoyear>-W<isoweek>" form (no marker churn / double-rollover on upgrade);
+# Sun uses "<year>-U<sunweek>".
+week_marker_id() {
+  if [ "$(vt_week_start)" = sun ]; then
+    echo "$(date +%Y)-U$(date +%U)"
+  else
+    echo "$(iso_year)-W$(iso_week_num)"
+  fi
+}
+
+# Returns "YYYY-MM-DD → MM-DD" for the current week (start → end), honoring
+# week-start.
 iso_week_range() {
-  local today dow mon sun
-  today=$(date +"%Y-%m-%d")
-  dow=$(date +"%u")     # 1=Mon ... 7=Sun
-  mon=$(date -v-$((dow-1))d +"%Y-%m-%d" 2>/dev/null || date -d "$today -$((dow-1)) days" +"%Y-%m-%d")
-  sun=$(date -v-$((dow-1))d -v+6d +"%Y-%m-%d" 2>/dev/null || date -d "$today -$((dow-1)) days +6 days" +"%Y-%m-%d")
-  local sun_short
-  sun_short=${sun#????-}     # strip the year, keep MM-DD
-  echo "${mon} → ${sun_short}"
+  local back start end end_short
+  back=$(_week_back)
+  start=$(date -v-"${back}"d +"%Y-%m-%d" 2>/dev/null || date -d "today -${back} days" +"%Y-%m-%d")
+  end=$(date -v-"${back}"d -v+6d +"%Y-%m-%d" 2>/dev/null || date -d "today -${back} days +6 days" +"%Y-%m-%d")
+  end_short=${end#????-}     # strip the year, keep MM-DD
+  echo "${start} → ${end_short}"
 }
 
 # Read current state of a story from board.md.
@@ -146,32 +191,25 @@ compute_carry_forward() {
 }
 
 # Compute activity slice lines for a window.
-# Args: today|week, slice=completed|in-progress
+# Args: window=today|week, slice=completed|in-progress, [focus_ids] (in-progress only)
 # Outputs markdown bullet lines (one per match), or "- (none)" if empty.
+#   completed   = punctual journal: IDs that transitioned INTO done this window.
+#   in-progress = durative snapshot: the window's FOCUS IDs whose current column
+#                 is in-progress (no "touched this window" requirement — a story
+#                 started yesterday and still in-progress belongs in today's slice).
 activity_lines() {
-  local window="$1"
-  local slice="$2"
-  local date_filter=""
-  case "$window" in
-    today)
-      date_filter=$(iso_today)
-      ;;
-    week)
-      # All dates from Monday of current ISO week through today.
-      local dow mon
-      dow=$(date +"%u")
-      mon=$(date -v-$((dow-1))d +"%Y-%m-%d" 2>/dev/null || date -d "today -$((dow-1)) days" +"%Y-%m-%d")
-      date_filter="$mon"
-      ;;
-    *) echo "activity_lines: bad window $window" >&2; return 1 ;;
-  esac
+  local window="$1" slice="$2" focus_ids="${3:-}"
+  local ids="" id
 
-  [ ! -f "$TRANSITIONS" ] && { echo "- (none)"; return; }
-
-  local ids=""
   case "$slice" in
     completed)
-      # IDs that transitioned INTO done within window.
+      [ ! -f "$TRANSITIONS" ] && { echo "- (none)"; return; }
+      local date_filter
+      case "$window" in
+        today) date_filter=$(iso_today) ;;
+        week)  date_filter=$(week_start_date) ;;   # honors week-start config
+        *) echo "activity_lines: bad window $window" >&2; return 1 ;;
+      esac
       ids=$(awk -v start="$date_filter" -F'\t' '
         {
           # $1 is ISO timestamp like 2026-05-28T14:32:00Z; take date prefix
@@ -181,15 +219,9 @@ activity_lines() {
       ' "$TRANSITIONS" | awk '!seen[$0]++')
       ;;
     in-progress)
-      # IDs touched within window that are currently in in-progress.
-      local touched
-      touched=$(awk -v start="$date_filter" -F'\t' '
-        { d = substr($1, 1, 10); if (d >= start) print $2 }
-      ' "$TRANSITIONS" | awk '!seen[$0]++')
-      for id in $touched; do
-        local s
-        s=$(story_state "$id")
-        [ "$s" = "in-progress" ] && ids="${ids}${id}"$'\n'
+      for id in $focus_ids; do
+        [ -z "$id" ] && continue
+        [ "$(story_state "$id")" = "in-progress" ] && ids="${ids}${id}"$'\n'
       done
       ;;
     *) echo "activity_lines: bad slice $slice" >&2; return 1 ;;
@@ -199,9 +231,9 @@ activity_lines() {
     echo "- (none)"
     return
   fi
+  local title
   for id in $ids; do
     [ -z "$id" ] && continue
-    local title
     title=$(story_title "$id")
     if [ -n "$title" ]; then
       echo "- ${id}  ${title}"
@@ -230,8 +262,8 @@ render_today_section() {
   echo "## Today (${stamp})"
   echo "Focus: ${focus_display}"
   echo ""
-  echo "In progress today (touched today):"
-  activity_lines today in-progress
+  echo "In progress today:"
+  activity_lines today in-progress "$focus"
   echo ""
   echo "Completed today:"
   activity_lines today completed
@@ -244,7 +276,7 @@ render_week_section() {
   # Same provided-vs-absent rule as render_today_section: an explicit (even
   # empty) week_num is used verbatim; only an absent arg defaults to current.
   local week_num week_range
-  if [ "$#" -ge 2 ]; then week_num="$2"; else week_num="$(iso_week_num)"; fi
+  if [ "$#" -ge 2 ]; then week_num="$2"; else week_num="$(week_num_current)"; fi
   if [ "$#" -ge 3 ]; then week_range="$3"; else week_range="$(iso_week_range)"; fi
   local focus_display
   if [ -z "$focus" ]; then
@@ -256,7 +288,7 @@ render_week_section() {
   echo "Focus: ${focus_display}"
   echo ""
   echo "In progress this week:"
-  activity_lines week in-progress
+  activity_lines week in-progress "$focus"
   echo ""
   echo "Completed this week:"
   activity_lines week completed
@@ -295,7 +327,7 @@ write_focus_section() {
   week_focus=$(read_focus week);   week_stamp=$(read_week_stamp)
   case "$which" in
     today) today_focus="$new_focus"; today_stamp=$(iso_today) ;;
-    week)  week_focus="$new_focus";  week_stamp=$(iso_week_num) ;;
+    week)  week_focus="$new_focus";  week_stamp=$(week_num_current) ;;
     *) echo "write_focus_section: bad section $which" >&2; return 1 ;;
   esac
   {
@@ -357,7 +389,7 @@ refresh_priorities_activity() {
 week_stamp_current() {
   local ws="$1" iw
   case "$ws" in ''|*[!0-9]*) return 1 ;; esac
-  iw=$(iso_week_num)
+  iw=$(week_num_current)
   [ "$((10#$ws))" = "$((10#$iw))" ]
 }
 

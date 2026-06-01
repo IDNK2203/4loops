@@ -152,6 +152,38 @@ bash "$S/vt-transition.sh" T-002 done >/dev/null
 ck "dense: co-located T-004 survives T-002 move"  'grep -q T-004 "$VT_DIR/board.md"'
 unset VT_DIR
 
+echo "════ 5. Carry-over slice + week-start (P0-015) ════"
+W5=$(mktemp -d); export VT_DIR="$W5/.vibe-table"; mkboard "$VT_DIR"; : > "$VT_DIR/transitions.log"
+BOARD="$VT_DIR/board.md"; TRANSITIONS="$VT_DIR/transitions.log"; PRIORITIES="$VT_DIR/current-priorities.md"
+# shellcheck source=/dev/null
+source "$S/vt-priorities-lib.sh"
+cat >> "$BOARD" <<EOF
+|  |  | [P0] **P0-200** durative wip |  | [P0] **P0-202** shipped today |
+|  |  |  | [P0] **P0-201** in testing |  |
+EOF
+# P0-200 started 30d ago (NOT touched this window); P0-202 transitioned to done TODAY
+printf '%sT10:00:00Z\tP0-200\tplanning→in-progress\n%sT09:00:00Z\tP0-202\ttesting→done\n' "$D30" "$TODAY" > "$TRANSITIONS"
+IP=$(activity_lines today in-progress "P0-200")
+ck "carry-over: focused in-progress shows w/o today-touch" 'printf "%s" "$IP" | grep -q "P0-200"'
+ck "carry-over: empty focus → none"                        '[ "$(activity_lines today in-progress "")" = "- (none)" ]'
+ck "carry-over: focus not-in-progress → none"              '[ "$(activity_lines today in-progress "P0-201")" = "- (none)" ]'
+CP=$(activity_lines today completed)
+ck "completed: today journal shows P0-202"                 'printf "%s" "$CP" | grep -q "P0-202"'
+ck "completed: stale non-done excluded"                    '! printf "%s" "$CP" | grep -q "P0-200"'
+# week-start: default mon mirrors ISO exactly (no regression)
+ck "week-start: default = mon"                  '[ "$(vt_week_start)" = "mon" ]'
+ck "week-start: mon num == iso_week_num"        '[ "$(week_num_current)" = "$(iso_week_num)" ]'
+ck "week-start: mon marker == legacy form"      '[ "$(week_marker_id)" = "$(iso_year)-W$(iso_week_num)" ]'
+dow(){ date -j -f "%Y-%m-%d" "$1" +%u 2>/dev/null || date -d "$1" +%u; }
+ck "week-start: mon start_date is a Monday"     '[ "$(dow "$(week_start_date)")" = "1" ]'
+# week-start: sun read from config flips the boundary
+printf 'week-start: sun\n' > "$VT_DIR/config"
+ck "week-start: reads sun from config"          '[ "$(vt_week_start)" = "sun" ]'
+ck "week-start: sun num == %U"                  '[ "$(week_num_current)" = "$(date +%U)" ]'
+ck "week-start: sun start_date is a Sunday"     '[ "$(dow "$(week_start_date)")" = "7" ]'
+rm -f "$VT_DIR/config"
+unset VT_DIR
+
 echo
 echo "════ RESULT: $P passed, $F failed ════"
 [ "$F" -eq 0 ]

@@ -190,7 +190,7 @@ _remove_board_rows() {
 # ISO week via a marker. Safe to call any number of times. Prints a summary line.
 weekly_rollover() {
   [ -f "$BOARD" ] || return 0
-  local marker="$VT_DIR/.weekly-rolled-$(iso_year)-W$(iso_week_num)"
+  local marker="$VT_DIR/.weekly-rolled-$(week_marker_id)"
   [ -f "$marker" ] && return 0
   local month adir done_ids ab_ids dn an
   month=$(iso_today | cut -c1-7)
@@ -205,6 +205,6 @@ weekly_rollover() {
   : > "$marker" 2>/dev/null || true
   dn=$(printf '%s\n' "$done_ids" | grep -c .)
   an=$(printf '%s\n' "$ab_ids"   | grep -c .)
-  printf 'Weekly rollover (ISO %s-W%s): %s closed, %s abandoned → archive/%s/\n' \
-    "$(iso_year)" "$(iso_week_num)" "$dn" "$an" "$month"
+  printf 'Weekly rollover (%s): %s closed, %s abandoned → archive/%s/\n' \
+    "$(week_marker_id)" "$dn" "$an" "$month"
 }

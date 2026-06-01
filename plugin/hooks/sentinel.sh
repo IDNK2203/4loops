@@ -32,7 +32,7 @@ SID=$(vt_json_field "$HOOK_INPUT" '.session_id')
 WORKSPACE=$(basename "$(pwd)")
 
 TODAY_STAMP=$(read_today_stamp); ISO_TODAY=$(iso_today)
-WEEK_STAMP=$(read_week_stamp);   ISO_WEEK=$(iso_week_num)
+WEEK_STAMP=$(read_week_stamp);   ISO_WEEK=$(week_num_current)
 
 TODAY_STALE=false
 if [ -z "$TODAY_STAMP" ] || [ "$TODAY_STAMP" != "$ISO_TODAY" ]; then TODAY_STALE=true; fi
@@ -91,9 +91,6 @@ else
 fi
 
 [ -n "${DRIFT_LINE:-}" ] && D="${D}${nl}${DRIFT_LINE}${nl}"
-if ! vt_rail_armed; then
-  D="${D}${nl}[on-ramp] rail goes hard after your first /vt:today${nl}"
-fi
 
 # --- Session-scoped gate clearing + marker cleanup ------------------------------
 # A session that starts on an already-reconciled day carries its clearance forward
