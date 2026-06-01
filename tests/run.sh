@@ -184,6 +184,37 @@ ck "week-start: sun start_date is a Sunday"     '[ "$(dow "$(week_start_date)")"
 rm -f "$VT_DIR/config"
 unset VT_DIR
 
+echo "════ 6. Configure + bootstrap (P0-015) ════"
+W6=$(mktemp -d)
+mkdir -p "$W6/proj-one/.git" "$W6/proj-one/content" "$W6/node_modules/dep/.git" "$W6/.git"
+printf '{}' > "$W6/proj-one/package.json"
+DET=$("$S/vt-detect.sh" "$W6")
+ck "detect: finds top-level project"      'printf "%s" "$DET" | grep -qE "^PROJECT'$'\t''proj-one'$'\t''[A-Z0-9]{2,3}$"'
+ck "detect: finds gated content glob"     'printf "%s" "$DET" | grep -q "^GATED'$'\t''\*/content/\*$"'
+ck "detect: prunes node_modules repo"     '! printf "%s" "$DET" | grep -q "'$'\t''dep'$'\t''"'
+ck "detect: excludes the root repo"       '[ "$(printf "%s" "$DET" | grep -c "^PROJECT")" = "1" ]'
+# config writes (idempotent, replace/upsert)
+export VT_DIR="$W6/.vibe-table"
+"$S/vt-config.sh" week-start sun >/dev/null
+"$S/vt-config.sh" gated 'a/*' 'b/*' >/dev/null
+"$S/vt-config.sh" project PR "Proj One" "me/proj-one" >/dev/null
+# shellcheck source=/dev/null
+source "$S/vt-priorities-lib.sh"; source "$S/vt-guard-lib.sh"
+ck "config: week-start reads back sun"    '[ "$(vt_week_start)" = "sun" ]'
+ck "config: gated REPLACES default"       'G=$(vt_gated_globs); printf "%s" "$G" | grep -q "a/\*" && ! printf "%s" "$G" | grep -q "repo-scaffolding"'
+ck "config: project row registered"       'grep -q "| PR | Proj One | me/proj-one |" "$VT_DIR/board.md"'
+# bootstrap: spawn-from-focus, end to end
+A=$("$S/vt-draft.sh" PR "ship the thing" | grep -oE 'PR-[0-9]+')
+B=$("$S/vt-draft.sh" PR "write the post" | grep -oE 'PR-[0-9]+')
+"$S/vt-week.sh"  "$A" "$B" >/dev/null
+"$S/vt-transition.sh" "$A" in-progress >/dev/null
+"$S/vt-today.sh" "$A" >/dev/null
+ck "bootstrap: rail armed after today"    '[ -f "$VT_DIR/.armed" ]'
+ck "bootstrap: A in priorities file"      'grep -q "'"$A"'" "$VT_DIR/current-priorities.md"'
+ck "bootstrap: today in-progress shows A" 'sed -n "/In progress today/,/Completed today/p" "$VT_DIR/current-priorities.md" | grep -q "'"$A"'"'
+ck "bootstrap: gate now clear (sun)"      '! vt_gate_active'
+unset VT_DIR
+
 echo
 echo "════ RESULT: $P passed, $F failed ════"
 [ "$F" -eq 0 ]
