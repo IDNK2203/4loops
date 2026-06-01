@@ -160,7 +160,8 @@ print_launch() {  # <root> <workspace>
   esac
   echo
   if [ "$EMPTY" = true ]; then
-    echo "Walk (virgin): confirm vt is SILENT (no .vibe-table yet) → /vt:draft a story → /vt:today."
+    echo "Walk (virgin): confirm vt is SILENT (no .vibe-table yet) → /vt:configure"
+    echo "       (detect → confirm projects/week-start/gated → bootstrap spawns this week's focus)."
   else
     echo "Walk:  sentinel renders (B3)"
     echo "       · ATTEMPT an Edit to projects/acme-demo/content/post.md (don't pre-judge it)"

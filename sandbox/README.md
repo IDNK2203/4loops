@@ -53,8 +53,10 @@ workspace/
   CLI), the rail **pre-armed**, and **no focus set** — so the gate is *active* and B1 is
   demoable immediately. (The first armed session also performs the weekly rollover, which
   archives the seeded Done story — expected.)
-- `--empty`: no board at all. Confirms `vt` is silent in a non-VT workspace, then you walk
-  `/vt:draft` → `/vt:today` (or P0-015's `/configure`) from scratch — the first-run on-ramp.
+- `--empty`: no board at all. Confirms `vt` is silent in a non-VT workspace, then you run
+  **`/vt:configure`** — the first-run flow: it detects the mock tree's gated surfaces, you
+  confirm projects + week-start, and bootstrap spawns this week's focus. The session should
+  end on a board full of your stories, not a template.
 
 ## The walkthrough (seeded, isolated)
 
@@ -67,7 +69,8 @@ workspace/
 3. **B2** — a fresh board has no week stamp (new ISO week), so run `/vt:week` **then**
    `/vt:today`. Now retry the gated edit in the **same session** → must be **allowed** (the
    session-id handshake holds across the lift).
-4. **B5** — `/vt:today` shows the 3-group `multiSelect`; selections map back to story IDs.
+4. **B5** — `/vt:today` shows the 4-group `multiSelect` (starting / →testing / done / park);
+   selections map back to story IDs.
 5. **B4** (`--real-install` only) — edit a hook header, bump the version in both manifests,
    `/plugin update`, `/reload-plugins`, new session → confirm the new hook runs.
 
