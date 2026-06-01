@@ -38,6 +38,8 @@ sandbox.sh — clean-room workspaces for dogfooding vibe-table
 USAGE
   sandbox.sh new [--light|--isolated] [--real-install] [--empty|--seeded] [name]
   sandbox.sh refresh <name>      reset the board to seed (keeps the workspace)
+  sandbox.sh expire <name>       backdate Today's focus → flips the gate ACTIVE
+                                 (demo the B1 rail block on a live, reconciled board)
   sandbox.sh list                show all sandboxes
   sandbox.sh rm <name>           delete a sandbox
 
@@ -225,6 +227,22 @@ cmd_refresh() {
   echo "✓ refreshed '$name' — board reset to seed ($root)"
 }
 
+cmd_expire() {  # backdate Today's stamp so a reconciled board reads stale → gate active
+  local name="${1:-}" root vt pri y
+  [ -z "$name" ] && die "usage: sandbox expire <name>"
+  root="$(find_sandbox "$name")" || die "no sandbox '$name'"
+  vt="$root/workspace/.vibe-table"
+  pri="$vt/current-priorities.md"
+  [ -f "$pri" ] || die "no current-priorities.md in '$name' — run /vt:configure (or /vt:today) first"
+  y=$(date -v-1d +%F 2>/dev/null || date -d 'yesterday' +%F)
+  # Backdate ONLY Today (leave Week current) so a single /vt:today lifts the gate
+  # again — the clean B1 (blocked) → B2 (allowed-same-session) demo.
+  sed -i.bak -E "s/## Today \([0-9-]+\)/## Today ($y)/" "$pri" && rm -f "$pri.bak"
+  : > "$vt/.armed"   # the gate only enforces once armed
+  echo "✓ expired '$name' — Today backdated to $y; the rail is now ACTIVE on the next gated write."
+  echo "  Demo: attempt an Edit to a gated path → BLOCKED (B1); run /vt:today → retry → ALLOWED (B2)."
+}
+
 cmd_list() {
   local found=0 d
   for d in "$PERSIST_BASE"/*/ "$TMP_BASE"/vt-sandbox-*/; do
@@ -254,6 +272,7 @@ cmd_rm() {
 case "${1:-}" in
   new)               shift; parse_new_args "$@"; cmd_new ;;
   refresh)           shift; cmd_refresh "${1:-}" ;;
+  expire)            shift; cmd_expire "${1:-}" ;;
   list)              cmd_list ;;
   rm)                shift; cmd_rm "${1:-}" ;;
   ""|-h|--help|help) usage ;;
