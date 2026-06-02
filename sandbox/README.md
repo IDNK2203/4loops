@@ -1,8 +1,8 @@
 # Vibe Table — Sandbox
 
 Disposable clean-room workspaces to dogfood `vt` exactly as a fresh user would. The
-script automates the manual fresh-install setup the [dogfood plan](../../../stories/vibe-table/02-sandbox/DOGFOOD-PLAN.md)'s
-**Track A** needs, so the live walkthrough (B1–B5) is one command and resettable.
+script automates the manual fresh-install setup, so the live walkthrough (B1–B5) is one
+command and resettable.
 
 ```bash
 sandbox/sandbox.sh new        # persistent isolated sandbox, injection, seeded board

@@ -22,7 +22,7 @@ MARKETPLACE="bls-vibe-table"   # must match .claude-plugin/marketplace.json "nam
 
 # ── Defaults (set by parse_new_args) ────────────────────────────────────────────
 # Default to --light: it keeps your real auth (no --bare → keychain/OAuth intact),
-# and since sandboxes live OUTSIDE ~/Ship/bls your BLS hooks don't load anyway.
+# and since sandboxes live OUTSIDE your project tree, other workspace hooks don't load.
 # --isolated (--bare) is hermetic but SKIPS OAuth/keychain → needs ANTHROPIC_API_KEY.
 MODE=light
 INSTALL=inject     # inject | real | "" (light)

@@ -22,6 +22,7 @@ It operates on whatever workspace it is enabled in. All state is plain files und
 
 - **SessionStart sentinel** — renders the board dashboard, surfaces drift, and auto-runs the weekly rollover (Done → `archive/<month>/closed.md`).
 - **PreToolUse hard gate** — focus-staleness blocks writes to gated product surfaces until the daily/weekly reconciliation runs. Per-session clearance carries across midnight; a single-action override (`VT_ALLOW_STALE_GATE=1`) is logged for escapes.
+- **Bash writes too** — a path-only Edit/Write gate is bypassable by shelling out, so the gate also re-derives write targets from Bash commands (`>`, `>>`, `tee`, `sed -i`) and applies the identical check. Known blind spots (not detected): `mv` / `cp` / `python -c "open(...)"` / `node -e`. Recommended: set `CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR=1` so relative paths resolve against the workspace root.
 - **Narrow by default** — only your product/deliverable surfaces are gated; research and notes always flow. `/vt:configure` proposes the gated set from what it finds in your workspace and lets you trim or add (see [Configuration](#configuration)).
 
 ## Configuration
@@ -65,5 +66,3 @@ MIT — see [`LICENSE`](LICENSE).
 ## Author
 
 [Ese Idukpaye](https://github.com/idnk2203). Built in the open as part of BLS (Build / Learn / Share).
-
-<!-- NOTE (pre-ship): framing/voice is a first-pass draft — refine before public ship. -->
