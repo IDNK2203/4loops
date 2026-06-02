@@ -65,9 +65,11 @@ sandbox_root() {  # <mode> <name>
   esac
 }
 
-find_sandbox() {  # <name> → echo root, or return 1
-  [ -d "$PERSIST_BASE/$1" ]        && { printf '%s' "$PERSIST_BASE/$1"; return 0; }
-  [ -d "$TMP_BASE/vt-sandbox-$1" ] && { printf '%s' "$TMP_BASE/vt-sandbox-$1"; return 0; }
+find_sandbox() {  # <name> → echo root, or return 1. Require the .sandbox-meta marker
+                  # (not bare dir existence) so a stale config-only dir left by an aborted
+                  # real-install can't shadow the real sandbox at the other location.
+  [ -f "$PERSIST_BASE/$1/.sandbox-meta" ]        && { printf '%s' "$PERSIST_BASE/$1"; return 0; }
+  [ -f "$TMP_BASE/vt-sandbox-$1/.sandbox-meta" ] && { printf '%s' "$TMP_BASE/vt-sandbox-$1"; return 0; }
   return 1
 }
 
@@ -239,8 +241,9 @@ cmd_expire() {  # backdate Today's stamp so a reconciled board reads stale → g
   # again — the clean B1 (blocked) → B2 (allowed-same-session) demo.
   sed -i.bak -E "s/## Today \([0-9-]+\)/## Today ($y)/" "$pri" && rm -f "$pri.bak"
   : > "$vt/.armed"   # the gate only enforces once armed
-  echo "✓ expired '$name' — Today backdated to $y; the rail is now ACTIVE on the next gated write."
-  echo "  Demo: attempt an Edit to a gated path → BLOCKED (B1); run /vt:today → retry → ALLOWED (B2)."
+  echo "✓ expired '$name' — Today backdated to $y; the rail is now ACTIVE for any NEW session."
+  echo "  Demo: start a FRESH session (the /configure session stays cleared by design) →"
+  echo "  attempt an Edit to a gated path → BLOCKED (B1); run /vt:today → retry → ALLOWED (B2)."
 }
 
 cmd_list() {

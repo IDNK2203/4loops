@@ -46,8 +46,8 @@ It prints one launch line: `cd <workspace> && claude --plugin-dir <plugin>`. `--
    ```bash
    sandbox/sandbox.sh expire closeout
    ```
-   Back in a session, ask Claude to **attempt** the same Edit to `projects/acme-demo/content/post.md` (don't let it pre-judge — make it run the Edit). The PreToolUse hook must **deny** it. Then drop `jq` off `PATH` and retry to confirm the `exit 2` fallback also blocks.
-   - [ ] **P0-014 · B1** — CC hard-blocks the gated Edit (and the no-jq fallback blocks too).
+   Then **start a fresh session** — `exit` and relaunch the `--plugin-dir` command. This matters: the session that ran `/vt:configure` was marked *cleared* and stays allowed for its whole life **by design** (a reconciled session is never re-blocked, even across midnight). The block only shows in a session that opens while the focus is stale. In that fresh session, ask Claude to **attempt** the Edit to `projects/acme-demo/content/post.md` (don't let it pre-judge — make it run the Edit). The PreToolUse hook must **deny** it. Then drop `jq` off `PATH` and retry to confirm the `exit 2` fallback also blocks.
+   - [ ] **P0-014 · B1** — a fresh stale-session hard-blocks the gated Edit (and the no-jq fallback blocks too).
    - [ ] exempt `study/notes.md` still allowed while gated.
 7. **Lift it, same session (B2 — the session-id handshake).** Run `/vt:today`, reconcile (you'll see the **4-group** multiSelect: starting / →testing / done / park), set focus. Immediately retry the gated Edit → it **must** be **ALLOWED** in the same session.
    - [ ] **P0-014 · B2** — `/vt:today` lifts the gate for the same session (no re-block loop).
