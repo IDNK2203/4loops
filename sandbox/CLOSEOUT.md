@@ -5,7 +5,7 @@ A single live pass that signs off **both** stories currently in Testing:
 - **P0-014 (Sandbox script)** — the live `B1–B5` rail proof + install-UX.
 - **P0-015 (Configuration & Onboarding)** — silent virgin → `/vt:configure` → bootstrap.
 
-The merge: one `--empty` real-install sandbox. `/vt:configure` fills the board (P0-015); then `sandbox.sh expire` flips that *same* reconciled board stale so the rail block (B1) is demoable — no separate `--seeded` sandbox needed.
+The merge: one `--empty --light` sandbox. `/vt:configure` fills the board (P0-015); then `sandbox.sh expire` flips that *same* reconciled board stale so the rail block (B1) is demoable — no separate `--seeded` sandbox needed.
 
 Walk it once, tick the boxes, and both stories are done. Budget ~15 min.
 
@@ -14,23 +14,19 @@ Walk it once, tick the boxes, and both stories are done. Budget ~15 min.
 ## Setup
 
 ```bash
-sandbox/sandbox.sh new --isolated --real-install --empty closeout
-```
-
-It prints the launch block. The real-install path tests the actual install machinery (skills appear = install-UX, and B4 version-cache). It uses a `$HOME` override and may need a one-time `/login` inside the session (or `ANTHROPIC_API_KEY`).
-
-**Fast fallback** — if real-install auth is a hassle, use `--light` instead:
-```bash
 sandbox/sandbox.sh new --light --empty closeout
 ```
-`--light` keeps your real auth and covers everything **except** install-UX + B4 (it loads `vt` via `--plugin-dir`, no install cache). Do the real-install pass at least once to claim B4.
+
+It prints one launch line: `cd <workspace> && claude --plugin-dir <plugin>`. `--light` points Claude straight at the plugin folder using your real login — no install, no marketplace, no `$HOME` override. It validates everything about whether the plugin **works**: silence in a virgin dir, `/vt:configure`, and the rail (B1 / B2 / B3 / B5).
+
+> **B4 (install/update machinery) is deferred to ship — see Act III.** `--light` never installs (it points at the live folder), so there's no marketplace cache to test. That pass happens for real once the repo is on GitHub.
 
 ---
 
 ## Act I — Onboarding (P0-015) + install-UX & silence (P0-014)
 
-1. **Install-UX.** Run the printed `marketplace add` + `install` lines. Confirm `/vt:*` skills appear and 4 hooks register.
-   - [ ] **P0-014 · install-UX** — skills + hooks present.
+1. **Skills + hooks load.** Launch with the printed `--plugin-dir` line. Confirm `/vt:*` skills appear and the 4 hooks are active (the SessionStart sentinel, the two PreToolUse gates, the prompt gate). (The *marketplace install* form of this is the ship-time pass — Act III.)
+   - [ ] **P0-014 · skills/hooks load** — `/vt:*` present, hooks firing.
 2. **Silent in a virgin workspace.** `cd` into the workspace (no `.vibe-table/` yet) and launch. The sentinel must be **silent** — no dashboard, no stderr.
    - [ ] **P0-015 · silent virgin** & **P0-014 · #1 silence** — nothing renders in a non-VT dir.
 3. **`/vt:configure`.** Run it. It should:
@@ -57,10 +53,13 @@ sandbox/sandbox.sh new --light --empty closeout
    - [ ] **P0-014 · B2** — `/vt:today` lifts the gate for the same session (no re-block loop).
    - [ ] **P0-014 · B5** — 4-group reconcile renders; selections map to IDs; Skip leaves the gate active.
 
-## Act III — Install machinery (P0-014 B4) — real-install only
+## Act III — Install machinery (P0-014 B4) — deferred to ship (P0-011)
 
-8. **Version-cache.** Edit a hook header (e.g. add a comment line to `plugin/hooks/sentinel.sh`), bump `version` in **both** manifests (`plugin/.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json`), `/plugin update` + `/reload-plugins`, start a new session → confirm the new header runs. (Then repeat *without* a bump to see the stale-cache trap.)
-   - [ ] **P0-014 · B4** — bump + reinstall propagates new hooks.
+B4 ("does bumping the version + reinstalling propagate new hooks past the cache?") only exists once the plugin is genuinely **installed** from a marketplace — which `--light` deliberately skips. We test it for real at publish time:
+
+> Push the repo to GitHub → in a fresh test workspace: `claude plugin marketplace add idnk2203/vibe-table` → `claude plugin install vt` (this is the real install-UX, exactly as a stranger sees it) → edit a hook header, bump `version` in **both** manifests (`plugin/.claude-plugin/plugin.json` + `.claude-plugin/marketplace.json`) → `/plugin update` + `/reload-plugins` → new session → confirm the new header runs.
+
+- [ ] **P0-014 · B4 (ship-gate, not now)** — carried into P0-011's pre-ship checklist.
 
 ## Act IV — Robustness (optional, P0-014 #9)
 
@@ -77,6 +76,8 @@ Per step: `#<step> · <expected> · <actual> · PASS/FAIL/SURPRISE · <note>`. L
 | Story | Closes when these pass |
 | --- | --- |
 | **P0-015** | Act I · steps 2 (silent), 3 (configure+bootstrap) |
-| **P0-014** | Act I · steps 1, 3 (B5), 4 (B3) · Act II · 6 (B1), 7 (B2/B5) · Act III · 8 (B4) |
+| **P0-014** | Act I · steps 1 (skills/hooks), 3 (B5), 4 (B3) · Act II · 6 (B1), 7 (B2/B5) |
+
+**B4** is the one carry-over: it can't be tested without a real marketplace install, so it rides P0-011's pre-ship checklist (Act III). P0-014 closes on B1/B2/B3/B5 here; B4 is signed off at publish.
 
 All green → `/vt:done P0-014` and `/vt:done P0-015`. Then tear down: `sandbox/sandbox.sh rm closeout`.
