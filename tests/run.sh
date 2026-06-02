@@ -215,6 +215,25 @@ ck "bootstrap: today in-progress shows A" 'sed -n "/In progress today/,/Complete
 ck "bootstrap: gate now clear (sun)"      '! vt_gate_active'
 unset VT_DIR
 
+echo "════ 7. Ship-prep fixes (P0-011) ════"
+W7=$(mktemp -d); export VT_DIR="$W7/.vibe-table"
+MO=$(date +%Y-%m)
+bash "$S/vt-draft.sh" T "just a backlog item" >/dev/null
+# shellcheck source=/dev/null
+source "$S/vt-priorities-lib.sh"; source "$S/vt-drift-lib.sh"
+weekly_rollover >/dev/null 2>&1
+ck "no-op rollover: no empty archive dir"     '[ ! -d "$VT_DIR/archive/'"$MO"'" ]'
+PID=$(bash "$S/vt-draft.sh" T 'Add foo | bar pipeline' | grep -oE 'T-[0-9]+')
+ck "pipe title: full text in board cell"      'grep -q "Add foo │ bar pipeline" "$VT_DIR/board.md"'
+ck "pipe title: story_title intact"           'printf "%s" "$(story_title "$PID")" | grep -q "bar pipeline"'
+ck "pipe title: no raw pipe leaks"            '! printf "%s" "$(story_title "$PID")" | grep -q "[|]"'
+bash "$S/vt-transition.sh" "$PID" done >/dev/null
+rm -f "$VT_DIR"/.weekly-rolled-*
+weekly_rollover >/dev/null 2>&1
+ck "rollover WITH content: dir created"        '[ -d "$VT_DIR/archive/'"$MO"'" ]'
+ck "pipe title: archive record intact"         'grep -q "Add foo │ bar pipeline" "$VT_DIR/archive/'"$MO"'/closed.md"'
+unset VT_DIR
+
 echo
 echo "════ RESULT: $P passed, $F failed ════"
 [ "$F" -eq 0 ]

@@ -53,7 +53,8 @@ case "$cmd" in
     key="${1:?usage: vt-config.sh project <key> <name> [repo]}"
     name="${2:?usage: vt-config.sh project <key> <name> [repo]}"
     repo="${3:-—}"
-    key="${key//|/\\|}"; name="${name//|/\\|}"; repo="${repo//|/\\|}"
+    # Swap real pipes for the │ lookalike (U+2502) — the table is awk -F'|' parsed.
+    key="${key//|/│}"; name="${name//|/│}"; repo="${repo//|/│}"
     # Upsert a row in the Projects table: replace the row whose key matches, else
     # insert just before the table's trailing blank line.
     awk -v key="$key" -v name="$name" -v repo="$repo" '

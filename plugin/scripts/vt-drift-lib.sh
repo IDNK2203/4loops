@@ -139,6 +139,7 @@ refresh_counts() {
 _archive_ids() {
   local ids="$1" file="$2" kind="$3" today id content
   [ -z "${ids//[[:space:]]/}" ] && return 0
+  mkdir -p "$(dirname "$file")" 2>/dev/null || true   # create the month dir only once there IS content
   today=$(iso_today)
   [ -f "$file" ] || printf '# Archive — %s\n\n' "$kind" > "$file"
   while IFS= read -r id; do
@@ -194,8 +195,7 @@ weekly_rollover() {
   [ -f "$marker" ] && return 0
   local month adir done_ids ab_ids dn an
   month=$(iso_today | cut -c1-7)
-  adir="$VT_DIR/archive/$month"
-  mkdir -p "$adir" 2>/dev/null || true
+  adir="$VT_DIR/archive/$month"   # created lazily by _archive_ids only when there's content
   done_ids=$(board_rows | awk -F'\t' '$2=="done"{print $1}')
   ab_ids=$(find_abandoned)
   _archive_ids "$done_ids" "$adir/closed.md"    "closed"

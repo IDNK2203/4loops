@@ -9,11 +9,14 @@ TITLE="${2:?usage: vt-draft <project> <title> [why] [context]}"
 WHY="${3:-}"
 CONTEXT="${4:-}"
 
-# Escape pipe chars so they don't break the markdown table
-PROJECT="${PROJECT//|/\\|}"
-TITLE="${TITLE//|/\\|}"
-WHY="${WHY//|/\\|}"
-CONTEXT="${CONTEXT//|/\\|}"
+# The board is parsed with awk -F'|', so a real '|' in any field — even
+# backslash-escaped — splits the row and truncates the cell (+ its archive
+# record). Swap it for the vertical-bar lookalike │ (U+2502): renders the same,
+# never splits. Applies to the board cell, story_title, and the archive record.
+PROJECT="${PROJECT//|/│}"
+TITLE="${TITLE//|/│}"
+WHY="${WHY//|/│}"
+CONTEXT="${CONTEXT//|/│}"
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 "$SCRIPT_DIR/vt-init.sh" >/dev/null
