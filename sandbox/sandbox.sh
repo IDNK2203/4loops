@@ -18,7 +18,7 @@ PLUGIN_DIR="$REPO/plugin"
 PLUGIN_SCRIPTS="$PLUGIN_DIR/scripts"
 TMP_BASE="/tmp"
 PERSIST_BASE="$HOME/Ship/vt-sandbox"
-MARKETPLACE="bls-vibe-table"   # must match .claude-plugin/marketplace.json "name"
+MARKETPLACE="vibe-table"   # must match .claude-plugin/marketplace.json "name"
 
 # ── Defaults (set by parse_new_args) ────────────────────────────────────────────
 # Default to --light: it keeps your real auth (no --bare → keychain/OAuth intact),

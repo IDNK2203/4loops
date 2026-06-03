@@ -1,11 +1,11 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-plugin-marketplace.json",
-  "name": "bls-vibe-table",
+  "name": "vibe-table",
   "owner": {
     "name": "idnk2203",
     "url": "https://github.com/idnk2203"
   },
-  "description": "Local marketplace hosting vibe-table during P0 dogfooding. Relocates to a public GitHub marketplace at ship.",
+  "description": "Vibe Table — an operator-loop discipline rail for Claude Code: story-state kanban + daily/weekly reconciliation behind a hard gate.",
   "plugins": [
     {
       "name": "vt",
