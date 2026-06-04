@@ -195,6 +195,13 @@ ck "detect: non-repo folder is an Area"   'printf "%s" "$DET" | grep -q "^AREA'$
 ck "detect: Area is not a Project"        '! printf "%s" "$DET" | grep -q "^PROJECT'$'\t''notes"'
 ck "detect: prunes node_modules repo"     '! printf "%s" "$DET" | grep -q "'$'\t''dep'$'\t''"'
 ck "detect: excludes the root repo"       '[ "$(printf "%s" "$DET" | grep -c "^PROJECT")" = "1" ]'
+# mono/root mode: a repo AT the workspace root (no nested repos) is the project
+W6r=$(mktemp -d); mkdir -p "$W6r/.git" "$W6r/src" "$W6r/docs"
+DETR=$("$S/vt-detect.sh" "$W6r")
+ck "detect(root): one project (the root repo)" '[ "$(printf "%s" "$DETR" | grep -c "^PROJECT")" = "1" ]'
+ck "detect(root): gates the whole workspace"   'printf "%s" "$DETR" | grep -q "^GATED'$'\t''\*$"'
+ck "detect(root): no Areas in mono mode"       '! printf "%s" "$DETR" | grep -q "^AREA"'
+rm -rf "$W6r"
 # config writes (idempotent, replace/upsert)
 export VT_DIR="$W6/.vibe-table"
 "$S/vt-config.sh" week-start sun >/dev/null
@@ -242,5 +249,19 @@ ck "pipe title: archive record intact"         'grep -q "Add foo │ bar pipelin
 unset VT_DIR
 
 echo
+echo "════ 8. Bash-gate: rm/mv/cp + cd-awareness (v1.1.2) ════"
+W8=$(mktemp -d); mkdir -p "$W8/.vibe-table/.cleared" "$W8/proj/.git" "$W8/proj/sub" "$W8/notes"
+export VT_DIR="$W8/.vibe-table"
+"$S/vt-config.sh" gated 'proj/*' >/dev/null
+: > "$VT_DIR/.armed"
+printf '## Today (2020-01-01)\n\n## Week 1 (2020-01-01 → 01-07)\n' > "$VT_DIR/current-priorities.md"
+ck "bash-gate: board is stale (gate active)"  'vt_gate_active'
+gate_blocks(){ local o r; o=$(printf '{"tool_input":{"command":"%s"},"session_id":"fresh-z","cwd":"%s"}' "$1" "$W8" | bash "$H/vt-bash-gate.sh" 2>&1); r=$?; printf '%s' "$o" | grep -q '"deny"' || [ "$r" = 2 ]; }
+ck "bash-gate: rm of gated file blocked"      'gate_blocks "rm proj/sub/x.js"'
+ck "bash-gate: cp into gated blocked"         'gate_blocks "cp /tmp/a.txt proj/a.txt"'
+ck "bash-gate: cd-then-rm gated blocked"      'gate_blocks "cd proj && rm sub/x.js"'
+ck "bash-gate: rm outside any project ok"     '! gate_blocks "rm notes/x.md"'
+unset VT_DIR
+
 echo "════ RESULT: $P passed, $F failed ════"
 [ "$F" -eq 0 ]

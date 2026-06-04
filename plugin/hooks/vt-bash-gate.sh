@@ -2,10 +2,11 @@
 # vt-bash-gate.sh — PreToolUse guard for Bash.
 #
 # A path-only Edit/Write guard is trivially bypassed by shelling out
-# (echo >> file, sed -i, tee). This re-derives write targets from the command
-# string and runs the IDENTICAL gate check per target, blocking on the first
-# gated target. Known blind spot (inherited from DevOS, documented): mv / cp /
-# python -c "open(...)" / node -e writes are not detected.
+# (echo >> file, sed -i, tee, rm, mv, cp). This re-derives write targets from the
+# command string and runs the IDENTICAL gate check per target, blocking on the
+# first gated target. Honors a leading `cd <dir> &&` so relative targets resolve
+# in the right place. Residual blind spots (fail-open): glob/quoted args, mid-
+# command cd chains & subshells, and arbitrary-code writers (python -c, node -e).
 #
 # FAIL-OPEN: any error → allow.
 set -uo pipefail
@@ -40,12 +41,31 @@ extract_targets() {
   if printf '%s' "$cmd" | grep -qE '(^|[|;&[:space:]])sed[[:space:]]+-i'; then
     printf '%s\n' "$cmd" | awk '{print $NF}'
   fi
+  # rm / mv / cp / touch / ln / mkdir — file mutators the redirect parser misses.
+  # Grab every arg after the command up to the next separator; flags and
+  # non-gated / glob / quoted tokens are filtered out by the per-target check below.
+  if printf '%s' "$cmd" | grep -qE '(^|[|;&[:space:]])(rm|mv|cp|touch|ln|mkdir)[[:space:]]'; then
+    printf '%s\n' "$cmd" \
+      | grep -oE '(^|[|;&[:space:]])(rm|mv|cp|touch|ln|mkdir)[[:space:]]+[^|;&<>]+' \
+      | sed -E 's/^[|;&[:space:]]*(rm|mv|cp|touch|ln|mkdir)[[:space:]]+//' \
+      | tr ' ' '\n'
+  fi
 }
 
 targets=$(extract_targets | awk 'NF' | sort -u)
 [ -z "$targets" ] && exit 0
 
 base="${cwd:-$PWD}"
+# Honor a leading `cd <dir> &&/;` so relative targets resolve in the right place
+# (e.g. `cd apps/x && rm public/y`). Best-effort — first cd only.
+cd_into=$(printf '%s' "$cmd" | grep -oE '^[[:space:]]*cd[[:space:]]+[^[:space:];&|]+' \
+  | sed -E 's/^[[:space:]]*cd[[:space:]]+//' | head -1)
+if [ -n "$cd_into" ]; then
+  case "$cd_into" in
+    /*) base="$cd_into" ;;
+    *)  base="${base%/}/$cd_into" ;;
+  esac
+fi
 while IFS= read -r t; do
   [ -z "$t" ] && continue
   # skip tokens with shell-expansion / quoting chars (false-positive prone)

@@ -26,48 +26,61 @@ suggest_prefix() {
   printf '%s' "${p:0:3}"
 }
 
-# Projects: git repos at any depth (2–4), excluding the workspace's own root repo.
-# A git repo is the high-confidence *auto-suggest* — /configure lets the user
-# promote an Area (non-repo folder) to a Project, or demote a suggestion. We do
-# NOT treat a bare marker file (README/package.json) as a project on its own:
-# that wrongly tracked plain doc folders. Track at the repo boundary.
-find "$ROOT" -maxdepth 4 \( -name node_modules -o -name .vibe-table \) -prune \
-     -o -type d -name .git -print 2>/dev/null \
-| while IFS= read -r g; do
+# Collect git repos (excluding node_modules/.vibe-table), separating the
+# workspace's OWN root repo from nested ones — they imply different shapes:
+#   nested repos present        → workspace mode (each nested repo is a project)
+#   no nested but root is a repo → mono/root mode (the root IS the single project)
+# A git repo is the high-confidence auto-suggest; /configure lets the user promote
+# an Area or demote a suggestion. We do NOT treat a bare marker file on its own
+# as a project (that wrongly tracked plain doc folders) — track at the repo boundary.
+ALL_GITS=$(find "$ROOT" -maxdepth 4 \( -name node_modules -o -name .vibe-table \) -prune \
+     -o -type d -name .git -print 2>/dev/null)
+NESTED=""; ROOT_IS_REPO=0
+while IFS= read -r g; do
+  [ -z "$g" ] && continue
   pd=$(dirname "$g")
-  [ "$pd" = "$ROOT" ] && continue            # the workspace's own repo, not a project
-  name=$(basename "$pd")
-  case "$name" in .*) continue ;; esac
-  printf 'PROJECT\t%s\t%s\n' "$name" "$(suggest_prefix "$name")"
-done | sort -u
+  if [ "$pd" = "$ROOT" ]; then
+    ROOT_IS_REPO=1
+  else
+    case "$(basename "$pd")" in .*) continue ;; esac
+    NESTED="${NESTED}${pd}"$'\n'
+  fi
+done <<EOF
+$ALL_GITS
+EOF
+NESTED=$(printf '%s' "$NESTED" | awk 'NF' | sort -u)
 
-# Areas: top-level folders that contain NO git repo — neither a Project (a repo)
-# nor project-space (a parent that houses repos). These are evolving/untracked
-# folders (notes, docs, context). /configure offers them for promotion; untracked
-# by default.
-for d in "$ROOT"/*/; do
-  [ -d "$d" ] || continue
-  name=$(basename "$d")
-  case "$name" in .*|node_modules|dist|build|public) continue ;; esac
-  # No `| head`: under set -e + pipefail, head closing the pipe SIGPIPEs find and
-  # aborts the script. Let find complete (exit 0); emptiness ⇒ no repo ⇒ an Area.
-  found=$(find "$d" -maxdepth 4 \( -name node_modules -o -name .vibe-table \) -prune \
-               -o -type d -name .git -print 2>/dev/null)
-  # `if` (not `&&`): a trailing `&&` that short-circuits makes the loop body — and
-  # thus the `… | sort` pipeline — exit non-zero, which set -e would treat as fatal.
-  if [ -z "$found" ]; then printf 'AREA\t%s\n' "$name"; fi
-done | sort -u
-
-# Gated surfaces: each PROJECT's WHOLE directory — one glob per project. The gate's
-# case-match treats '*' as spanning slashes, so '<project>/*' covers everything
-# inside, recursively. We gate at the project boundary, not specific subdirs:
-# establishing a project (a git repo) gates the entire thing. (Hard-exempt paths —
-# .vibe-table/, study/, root *.md, … — still always flow, even inside a project.)
-find "$ROOT" -maxdepth 4 \( -name node_modules -o -name .vibe-table \) -prune \
-     -o -type d -name .git -print 2>/dev/null \
-| while IFS= read -r g; do
-  pd=$(dirname "$g")
-  [ "$pd" = "$ROOT" ] && continue
-  case "$(basename "$pd")" in .*) continue ;; esac
-  printf 'GATED\t%s/*\n' "${pd#"$ROOT"/}"
-done | sort -u
+{
+  if [ -z "$NESTED" ] && [ "$ROOT_IS_REPO" = 1 ]; then
+    # Mono/root mode: the workspace root itself is the project; gate the WHOLE
+    # thing ('*' spans everything — hard-exempt paths still flow). No Areas:
+    # top-level folders are part of the root project, not separate.
+    name=$(basename "$ROOT")
+    printf 'PROJECT\t%s\t%s\n' "$name" "$(suggest_prefix "$name")"
+    printf 'GATED\t*\n'
+  else
+    # Workspace mode: nested repos are projects (whole-project gated, <project>/* —
+    # the gate's '*' spans slashes, so it covers everything inside). Non-repo
+    # top-level folders are Areas: evolving/untracked, promotable in /configure.
+    while IFS= read -r pd; do
+      [ -z "$pd" ] && continue
+      name=$(basename "$pd")
+      printf 'PROJECT\t%s\t%s\n' "$name" "$(suggest_prefix "$name")"
+      printf 'GATED\t%s/*\n' "${pd#"$ROOT"/}"
+    done <<EOF
+$NESTED
+EOF
+    for d in "$ROOT"/*/; do
+      [ -d "$d" ] || continue
+      name=$(basename "$d")
+      case "$name" in .*|node_modules|dist|build|public) continue ;; esac
+      # No `| head`: under set -e + pipefail, head SIGPIPEs find and aborts. Let
+      # find complete (exit 0); emptiness ⇒ no repo inside ⇒ an Area.
+      found=$(find "$d" -maxdepth 4 \( -name node_modules -o -name .vibe-table \) -prune \
+                   -o -type d -name .git -print 2>/dev/null)
+      # `if` (not `&&`): a short-circuiting trailing `&&` makes the loop/pipeline
+      # exit non-zero, which set -e would treat as fatal.
+      if [ -z "$found" ]; then printf 'AREA\t%s\n' "$name"; fi
+    done
+  fi
+} | sort -u
