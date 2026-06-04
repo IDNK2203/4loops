@@ -24,7 +24,7 @@ VT_DIR="${VT_DIR:-./.vibe-table}"
 BOARD="$VT_DIR/board.md"
 
 if [ ! -f "$BOARD" ]; then
-  echo "No board.md found. Run /vt:draft first to initialize." >&2; exit 1
+  echo "No board yet — run /vt:configure first to set up your board." >&2; exit 1
 fi
 
 # Find the row + identify current state column + extract content

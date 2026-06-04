@@ -186,11 +186,13 @@ unset VT_DIR
 
 echo "════ 6. Configure + bootstrap (P0-015) ════"
 W6=$(mktemp -d)
-mkdir -p "$W6/proj-one/.git" "$W6/proj-one/content" "$W6/node_modules/dep/.git" "$W6/.git"
+mkdir -p "$W6/proj-one/.git" "$W6/proj-one/content" "$W6/notes" "$W6/node_modules/dep/.git" "$W6/.git"
 printf '{}' > "$W6/proj-one/package.json"
 DET=$("$S/vt-detect.sh" "$W6")
 ck "detect: finds top-level project"      'printf "%s" "$DET" | grep -qE "^PROJECT'$'\t''proj-one'$'\t''[A-Z0-9]{2,3}$"'
-ck "detect: finds gated content glob"     'printf "%s" "$DET" | grep -q "^GATED'$'\t''\*/content/\*$"'
+ck "detect: gated glob is per-repo"       'printf "%s" "$DET" | grep -q "^GATED'$'\t''proj-one/content/\*$"'
+ck "detect: non-repo folder is an Area"   'printf "%s" "$DET" | grep -q "^AREA'$'\t''notes$"'
+ck "detect: Area is not a Project"        '! printf "%s" "$DET" | grep -q "^PROJECT'$'\t''notes"'
 ck "detect: prunes node_modules repo"     '! printf "%s" "$DET" | grep -q "'$'\t''dep'$'\t''"'
 ck "detect: excludes the root repo"       '[ "$(printf "%s" "$DET" | grep -c "^PROJECT")" = "1" ]'
 # config writes (idempotent, replace/upsert)

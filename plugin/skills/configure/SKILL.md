@@ -1,7 +1,7 @@
 ---
 name: configure
 description: First-run setup for Vibe Table — detect the projects you track, choose a week-start, confirm which build/share surfaces the rail guards, then bootstrap your board by spawning this week's focus. Run this once, right after the plugin installs. The aha is the first reconciliation, not a feature tour.
-allowed-tools: Bash, AskUserQuestion
+allowed-tools: Bash, AskUserQuestion, TodoWrite
 user-invocable: true
 ---
 
@@ -13,6 +13,18 @@ user-invocable: true
 
 ## Steps
 
+**Drive the flow with a visible checklist** so configure reads as stepping tasks, not a wall of questions. Before step 1, create a `TodoWrite` list with these items:
+
+1. Detect projects
+2. Confirm projects + prefixes
+3. Choose week start
+4. Confirm gated surfaces
+5. Set this week's anchors
+6. Pick today's focus
+7. Arm rail + render board
+
+Mark each `in_progress` when you start it and `completed` when it's done — the user watches the checklist fill in as they go.
+
 ### 1. Init + detect
 
 ```bash
@@ -21,21 +33,27 @@ user-invocable: true
 ```
 
 `vt-detect.sh` prints TSV candidates (never writes):
-- `PROJECT<TAB><name><TAB><suggested-prefix>` — top-level project dirs + nested git repos.
-- `GATED<TAB><glob>` — likely build/share surfaces (content/, dist/, public/, …), already generalized per-project.
+- `PROJECT<TAB><name><TAB><suggested-prefix>` — **git repos** (the high-confidence auto-suggest).
+- `AREA<TAB><name>` — non-repo top-level folders (notes/docs/context). Untracked by default; offer to promote.
+- `GATED<TAB><glob>` — build/share surfaces inside projects (content/, dist/, public/, …), **per-repo** (not generalized).
 
-Hold these two lists.
+Hold these three lists.
 
-### 2. Projects — propose, confirm, set prefixes
+### 2. Projects + Areas — confirm what's tracked
 
-`AskUserQuestion` (multiSelect, header "Projects"): options = each detected `PROJECT` labeled `name (PREFIX)`. The user trims; **Other** adds any the scan missed (`name` → you propose a prefix). The PREFIX is the story-ID stem (e.g. `VT` → `VT-001`) — if the user wants a different one for a chosen project, take it from their note/Other and use that.
+A **Project** is something with a done-state you'll track (git repos are the auto-suggest — but it's the user's call). An **Area** is an evolving folder with no done-state — untracked and never gated. Sort the candidates:
+
+- `AskUserQuestion` (multiSelect, header "Projects"): options = each detected `PROJECT` labeled `name (PREFIX)`, **pre-selected**. Deselecting one **demotes** it to an Area (untracked). **Other** adds a project the scan missed — including **promoting** a detected Area (name it, propose a prefix).
+- If any `AREA` candidates were detected, surface them so the promote choice is explicit: *"Detected these as untracked Areas: `<names>`. Promote any to a tracked Project?"* Promote → register like a project; leave → simply untracked (no gating, free-edit; no registration needed).
+
+The PREFIX is the story-ID stem (e.g. `VT` → `VT-001`); honor a custom prefix from the user's note/Other.
 
 For each confirmed project:
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/scripts/vt-config.sh" project <PREFIX> "<name>" [<repo>]
 ```
 
-If detection found nothing, just ask the user to name their first project + prefix, then register it. At least one project is required (bootstrap needs a prefix to spawn stories under).
+If detection found nothing trackable, ask the user to name their first project + prefix, then register it. At least one project is required (bootstrap needs a prefix to spawn stories under). Areas need no registration — untracked is their default.
 
 ### 3. Week start
 
@@ -79,14 +97,20 @@ This is the aha. Don't tour; **fill the board with the user's real work.**
    ```
    (`vt-today.sh` writes the Today stamp, arms the rail, and marks this session cleared — the gate is now live but satisfied.)
 
-### 6. Render + hand off
+### 6. Celebrate + render + hand off
 
-```bash
-"${CLAUDE_PLUGIN_ROOT}/scripts/vt-render.sh"
-cat .vibe-table/current-priorities.md
-```
+Make the finish a *moment* — the first reconciliation is the aha, so mark it:
 
-Tell the user where it lives (`.vibe-table/` in the workspace root) and that the board re-renders itself at the start of every session via the sentinel. From here the loop is `/vt:today` daily, `/vt:week` weekly. **Do not** narrate an on-ramp or feature list — the board they just filled is the message.
+1. Say it plainly: **"🎉 Vibe Table is configured — your board is live."**
+2. Render the board (the payoff):
+   ```bash
+   "${CLAUDE_PLUGIN_ROOT}/scripts/vt-render.sh"
+   cat .vibe-table/current-priorities.md
+   ```
+3. One line on the loop, and nothing more: **"From here: `/vt:today` each day to reconcile, `/vt:week` each week to anchor. Move stories with `/vt:start` · `/vt:test` · `/vt:done`, or just ask me to move them."**
+4. Mark the final todo `completed`.
+
+It lives in `.vibe-table/` at your workspace root and re-renders at the start of every session via the sentinel. **Do not** narrate an on-ramp or feature list — the board they just filled plus that one-line loop *is* the whole message.
 
 ## Notes
 

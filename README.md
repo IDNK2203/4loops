@@ -27,6 +27,8 @@ It operates on whatever workspace it is enabled in. All state is plain files und
 
 ## Configuration
 
+**Projects & Areas.** `/vt:configure` detects your **git repos** as *Projects* — the things you track to a done-state on the board, whose build/share surfaces (`dist/`, `public/`, `content/`) the gate guards. Every other top-level folder is an *Area*: evolving notes/docs with no done-state, left untracked and free to edit. Promote an Area to a Project (or demote one) during setup — git is just the default signal, the call is yours.
+
 `/vt:configure` writes `.vibe-table/config` (plain `key: value` lines) plus your projects into the board. Re-running is safe — keys are replaced, project rows upserted. You can also hand-edit:
 
 | Key | Values | Effect |
@@ -43,8 +45,6 @@ gated: projects/*/gists/*
 The **hard-exempt** surfaces are always writable regardless of config — `.vibe-table/`, `.claude/`, `study/`, `learnings/`, `inbox/`, `reviews/`, root `*.md`, `ARTIFACTS.md`, `.env*`, `.gitignore` — so the gate can never block its own reconciliation, your research, or your notes.
 
 ## Install
-
-> Currently dogfooded via a local directory marketplace during BLS P0. At ship this relocates to a public GitHub marketplace.
 
 ```
 /plugin marketplace add idnk2203/vibe-table

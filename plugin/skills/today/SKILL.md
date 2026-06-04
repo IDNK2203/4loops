@@ -13,6 +13,16 @@ user-invocable: true
 
 ## Steps
 
+### 0. Require configuration
+
+This skill reconciles a **configured** board — it must not create a bare one. Check first:
+
+```bash
+[ -f .vibe-table/config ] && echo CONFIGURED || echo UNCONFIGURED
+```
+
+If `UNCONFIGURED`, stop here and tell the user: **"No Vibe Table board is configured in this directory yet — run `/vt:configure` first to set up your projects, gates, and focus."** Do not run the steps below.
+
 ### 1. Orient: board + drift + carry-forward suggestion
 
 ```bash

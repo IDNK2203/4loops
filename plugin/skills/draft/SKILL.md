@@ -18,6 +18,16 @@ Create a new story-draft in the Backlog.
 
 ## Steps
 
+### 0. Require configuration
+
+Drafting adds a story to a **configured** board — it must not create a bare one. Check first:
+
+```bash
+[ -f .vibe-table/config ] && echo CONFIGURED || echo UNCONFIGURED
+```
+
+If `UNCONFIGURED`, stop here and tell the user: **"No Vibe Table board is configured in this directory yet — run `/vt:configure` first to set up your projects, gates, and focus."** Do not run the steps below. (This skill is also invoked internally by `/vt:configure`'s bootstrap, which calls the `vt-draft.sh` script directly and is unaffected by this guard.)
+
 ### 1. Parse args from the user's message
 
 Extract `<title>`, `--project`, `--why`, `--context`. Title is the first positional arg, the rest are flags.

@@ -18,7 +18,7 @@ VT_DIR="${VT_DIR:-./.vibe-table}"
 BOARD="$VT_DIR/board.md"
 
 if [ ! -f "$BOARD" ]; then
-  echo "No board yet. Run /vt:draft <title> --project <P> to create your first story." >&2
+  echo "No board yet. Run /vt:configure to set up your projects, gates, and this week's focus." >&2
   exit 0
 fi
 
