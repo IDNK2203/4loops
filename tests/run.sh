@@ -190,7 +190,7 @@ mkdir -p "$W6/proj-one/.git" "$W6/proj-one/content" "$W6/notes" "$W6/node_module
 printf '{}' > "$W6/proj-one/package.json"
 DET=$("$S/vt-detect.sh" "$W6")
 ck "detect: finds top-level project"      'printf "%s" "$DET" | grep -qE "^PROJECT'$'\t''proj-one'$'\t''[A-Z0-9]{2,3}$"'
-ck "detect: gated glob is per-repo"       'printf "%s" "$DET" | grep -q "^GATED'$'\t''proj-one/content/\*$"'
+ck "detect: gated glob is whole-project"  'printf "%s" "$DET" | grep -q "^GATED'$'\t''proj-one/\*$"'
 ck "detect: non-repo folder is an Area"   'printf "%s" "$DET" | grep -q "^AREA'$'\t''notes$"'
 ck "detect: Area is not a Project"        '! printf "%s" "$DET" | grep -q "^PROJECT'$'\t''notes"'
 ck "detect: prunes node_modules repo"     '! printf "%s" "$DET" | grep -q "'$'\t''dep'$'\t''"'
@@ -215,6 +215,11 @@ ck "bootstrap: rail armed after today"    '[ -f "$VT_DIR/.armed" ]'
 ck "bootstrap: A in priorities file"      'grep -q "'"$A"'" "$VT_DIR/current-priorities.md"'
 ck "bootstrap: today in-progress shows A" 'sed -n "/In progress today/,/Completed today/p" "$VT_DIR/current-priorities.md" | grep -q "'"$A"'"'
 ck "bootstrap: gate now clear (sun)"      '! vt_gate_active'
+# whole-project gating (v1.1.1): one glob gates the ENTIRE project, recursively
+"$S/vt-config.sh" gated 'proj-one/*' >/dev/null
+ck "gate: deep file in project gated"        'vt_is_gated "$W6/proj-one/src/deep/x.js" "$W6"'
+ck "gate: new root-level project file gated" 'vt_is_gated "$W6/proj-one/style.css" "$W6"'
+ck "gate: Area file not gated"               '! vt_is_gated "$W6/notes/draft.md" "$W6"'
 unset VT_DIR
 
 echo "════ 7. Ship-prep fixes (P0-011) ════"

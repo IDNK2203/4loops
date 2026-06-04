@@ -6,7 +6,7 @@
 # Output lines (tab-separated):
 #   PROJECT<TAB><dirname><TAB><suggested-prefix>   git repos (the auto-suggest heuristic)
 #   AREA<TAB><dirname>                             non-repo top-level folders (untracked candidates)
-#   GATED<TAB><glob>                               build/share surfaces, per-repo (root-relative, deduped)
+#   GATED<TAB><glob>                               each project's WHOLE dir (<project>/*), root-relative
 #
 # Usage: vt-detect.sh [root]   (root defaults to $PWD)
 set -euo pipefail
@@ -58,12 +58,16 @@ for d in "$ROOT"/*/; do
   if [ -z "$found" ]; then printf 'AREA\t%s\n' "$name"; fi
 done | sort -u
 
-# Gated surfaces: build/share dirs (depth ≤3) → literal per-repo glob. We do NOT
-# generalize the parent segment to '*' (the old projects/*/content/* form) — track
-# at the repo boundary so each project's surfaces gate explicitly.
-for pat in content dist build public out site _site gists; do
-  find "$ROOT" -maxdepth 3 -name node_modules -prune -o -type d -name "$pat" -print 2>/dev/null
-done | while IFS= read -r hit; do
-  rel="${hit#"$ROOT"/}"
-  printf 'GATED\t%s/*\n' "$rel"
+# Gated surfaces: each PROJECT's WHOLE directory — one glob per project. The gate's
+# case-match treats '*' as spanning slashes, so '<project>/*' covers everything
+# inside, recursively. We gate at the project boundary, not specific subdirs:
+# establishing a project (a git repo) gates the entire thing. (Hard-exempt paths —
+# .vibe-table/, study/, root *.md, … — still always flow, even inside a project.)
+find "$ROOT" -maxdepth 4 \( -name node_modules -o -name .vibe-table \) -prune \
+     -o -type d -name .git -print 2>/dev/null \
+| while IFS= read -r g; do
+  pd=$(dirname "$g")
+  [ "$pd" = "$ROOT" ] && continue
+  case "$(basename "$pd")" in .*) continue ;; esac
+  printf 'GATED\t%s/*\n' "${pd#"$ROOT"/}"
 done | sort -u

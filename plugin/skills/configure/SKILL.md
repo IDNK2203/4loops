@@ -1,6 +1,6 @@
 ---
 name: configure
-description: First-run setup for Vibe Table — detect the projects you track, choose a week-start, confirm which build/share surfaces the rail guards, then bootstrap your board by spawning this week's focus. Run this once, right after the plugin installs. The aha is the first reconciliation, not a feature tour.
+description: First-run setup for Vibe Table — detect the projects you track, choose a week-start, confirm which projects the rail guards, then bootstrap your board by spawning this week's focus. Run this once, right after the plugin installs. The aha is the first reconciliation, not a feature tour.
 allowed-tools: Bash, AskUserQuestion, TodoWrite
 user-invocable: true
 ---
@@ -13,17 +13,19 @@ user-invocable: true
 
 ## Steps
 
-**Drive the flow with a visible checklist** so configure reads as stepping tasks, not a wall of questions. Before step 1, create a `TodoWrite` list with these items:
+### 0. Open the checklist — your FIRST action, before any bash
+
+Your **very first tool call MUST be `TodoWrite`**, creating these 7 todos (all `pending`). Do not run any Bash before it — the visible, filling-in checklist is part of the experience, not optional:
 
 1. Detect projects
 2. Confirm projects + prefixes
 3. Choose week start
-4. Confirm gated surfaces
+4. Confirm gated projects
 5. Set this week's anchors
 6. Pick today's focus
 7. Arm rail + render board
 
-Mark each `in_progress` when you start it and `completed` when it's done — the user watches the checklist fill in as they go.
+Then keep it live: set the current todo `in_progress` before each step and `completed` right after (exactly one `in_progress` at a time). The steps below map onto these todos.
 
 ### 1. Init + detect
 
@@ -35,7 +37,7 @@ Mark each `in_progress` when you start it and `completed` when it's done — the
 `vt-detect.sh` prints TSV candidates (never writes):
 - `PROJECT<TAB><name><TAB><suggested-prefix>` — **git repos** (the high-confidence auto-suggest).
 - `AREA<TAB><name>` — non-repo top-level folders (notes/docs/context). Untracked by default; offer to promote.
-- `GATED<TAB><glob>` — build/share surfaces inside projects (content/, dist/, public/, …), **per-repo** (not generalized).
+- `GATED<TAB><glob>` — each project's **whole directory** (`<project>/*`); the gate guards everything inside it.
 
 Hold these three lists.
 
@@ -62,15 +64,15 @@ If detection found nothing trackable, ask the user to name their first project +
 "${CLAUDE_PLUGIN_ROOT}/scripts/vt-config.sh" week-start <mon|sun>
 ```
 
-### 4. Gating — propose-then-confirm
+### 4. Gating — confirm the gated projects
 
-The rail blocks product-surface writes until you've reconciled, so it's useful from day one. `AskUserQuestion` (multiSelect, header "Gated"): options = each detected `GATED` glob, **pre-selected**. The user trims/adds (Other = a custom glob). Seed with the built-ins `projects/*/content/*`, `projects/*/gists/*`, `projects/*/repo-scaffolding/*` if detection is thin, so there are ≥2 options and the set is sensible.
+The rail blocks writes to a tracked project until you've reconciled, so it's useful from day one. Each detected `GATED` glob is a **whole project** (`<project>/*` — the gate matches *everything inside it*, source included). `AskUserQuestion` (multiSelect, header "Gated"): options = each `GATED` glob, **pre-selected** (default: every project is gated as a whole). Deselecting one tracks that project on the board but leaves it ungated; **Other** = a custom glob. If you promoted an Area to a Project in step 2, add its `<area>/*` glob here too.
 
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/scripts/vt-config.sh" gated <glob1> <glob2> ...
 ```
 
-This **replaces** the built-in default glob set — once written, only these globs gate. (The hard-exempt surfaces — `.vibe-table/`, `study/`, `learnings/`, root `*.md`, `.env` — are always writable regardless.)
+This **replaces** the built-in default glob set — once written, only these globs gate. (The hard-exempt surfaces — `.vibe-table/`, `study/`, `learnings/`, root `*.md`, `.env` — always flow, even inside a gated project, so the ritual can never block itself.)
 
 Show the final config: `"${CLAUDE_PLUGIN_ROOT}/scripts/vt-config.sh" show`.
 

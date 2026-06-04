@@ -23,7 +23,7 @@ It operates on whatever workspace it is enabled in. All state is plain files und
 - **SessionStart sentinel** — renders the board dashboard, surfaces drift, and auto-runs the weekly rollover (Done → `archive/<month>/closed.md`).
 - **PreToolUse hard gate** — focus-staleness blocks writes to gated product surfaces until the daily/weekly reconciliation runs. Per-session clearance carries across midnight; a single-action override (`VT_ALLOW_STALE_GATE=1`) is logged for escapes.
 - **Bash writes too** — a path-only Edit/Write gate is bypassable by shelling out, so the gate also re-derives write targets from Bash commands (`>`, `>>`, `tee`, `sed -i`) and applies the identical check. Known blind spots (not detected): `mv` / `cp` / `python -c "open(...)"` / `node -e`. Recommended: set `CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR=1` so relative paths resolve against the workspace root.
-- **Narrow by default** — only your product/deliverable surfaces are gated; research and notes always flow. `/vt:configure` proposes the gated set from what it finds in your workspace and lets you trim or add (see [Configuration](#configuration)).
+- **Project-scoped by default** — each tracked project is gated as a *whole* (everything inside it, source included); Areas — notes, research, docs — always flow. `/vt:configure` proposes the gated set (your projects) and lets you trim or add (see [Configuration](#configuration)).
 
 ## Configuration
 
@@ -34,12 +34,12 @@ It operates on whatever workspace it is enabled in. All state is plain files und
 | Key | Values | Effect |
 | --- | --- | --- |
 | `week-start:` | `mon` (default) / `sun` | First day of the week — threads through the week range, the staleness check, and the weekly rollover boundary. |
-| `gated:` | one glob per line, root-relative | The product surfaces the gate guards. **Any `gated:` line replaces the built-in default** (`projects/*/content/*`, `projects/*/gists/*`, `projects/*/repo-scaffolding/*`) — list every surface you want gated. |
+| `gated:` | one glob per line, root-relative | The projects the gate guards — whole-project globs like `apps/web-dashboard/*` (the `*` spans subdirectories, so everything inside is covered). **Any `gated:` line replaces the built-in default** — list every surface you want gated. |
 
 ```
 week-start: mon
-gated: projects/*/content/*
-gated: projects/*/gists/*
+gated: apps/web-dashboard/*
+gated: apps/notes-cli/*
 ```
 
 The **hard-exempt** surfaces are always writable regardless of config — `.vibe-table/`, `.claude/`, `study/`, `learnings/`, `inbox/`, `reviews/`, root `*.md`, `ARTIFACTS.md`, `.env*`, `.gitignore` — so the gate can never block its own reconciliation, your research, or your notes.

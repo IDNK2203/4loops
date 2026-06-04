@@ -2,7 +2,7 @@
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "vt",
   "displayName": "Vibe Table",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Personal orientation layer for solo operators: story-state kanban + daily/weekly priorities + surfaced drift, enforced by a SessionStart sentinel and a PreToolUse hard gate (focus-staleness blocks product-surface writes until the daily/weekly reconciliation runs). Operates on whatever workspace it is enabled in.",
   "author": {
     "name": "idnk2203",
