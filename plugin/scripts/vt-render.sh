@@ -14,11 +14,11 @@
 # <state> is one of: backlog | planning | in-progress | testing | done
 set -euo pipefail
 
-VT_DIR="${VT_DIR:-./.vibe-table}"
+VT_DIR="${VT_DIR:-./.4loops}"
 BOARD="$VT_DIR/board.md"
 
 if [ ! -f "$BOARD" ]; then
-  echo "No board yet. Run /vt:configure to set up your projects, gates, and this week's focus." >&2
+  echo "No board yet. Run /4loops:configure to set up your projects, gates, and this week's focus." >&2
   exit 0
 fi
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# vt-config.sh — write .vibe-table/config keys + register projects in board.md.
+# vt-config.sh — write .4loops/config keys + register projects in board.md.
 # Centralizes every config mutation /configure performs.
 #
 # Subcommands:
@@ -12,7 +12,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-VT_DIR="${VT_DIR:-./.vibe-table}"
+VT_DIR="${VT_DIR:-./.4loops}"
 CONFIG="$VT_DIR/config"
 BOARD="$VT_DIR/board.md"
 "$SCRIPT_DIR/vt-init.sh" >/dev/null

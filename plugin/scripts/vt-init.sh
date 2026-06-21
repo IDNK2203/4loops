@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
-# vt-init.sh — initialize .vibe-table/ in workspace root (cwd).
+# vt-init.sh — initialize .4loops/ in workspace root (cwd).
 # Idempotent: safe to call any number of times.
 set -euo pipefail
 
-VT_DIR="${VT_DIR:-./.vibe-table}"
+VT_DIR="${VT_DIR:-./.4loops}"
 
 mkdir -p "$VT_DIR/.ids" "$VT_DIR/archive" "$VT_DIR/.cleared"
 touch "$VT_DIR/transitions.log"
 
 if [ ! -f "$VT_DIR/board.md" ]; then
   cat > "$VT_DIR/board.md" <<'EOF'
-# Vibe Table
+# 4loops
 
 **Counts:** Backlog 0 · Planning 0 · In Progress 0 · Testing 0 · Done 0
 

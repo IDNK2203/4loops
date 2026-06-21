@@ -1,6 +1,6 @@
-# Contributing to Vibe Table
+# Contributing to 4loops
 
-Thanks for considering a contribution. Vibe Table is a Claude Code plugin — all bash + markdown, no build step. Below is what you need to land a PR fast.
+Thanks for considering a contribution. 4loops is a Claude Code plugin — all bash + markdown, no build step. Below is what you need to land a PR fast.
 
 ## Ground rules
 
@@ -12,18 +12,18 @@ Thanks for considering a contribution. Vibe Table is a Claude Code plugin — al
 ## Dev setup
 
 ```
-git clone https://github.com/idnk2203/vibe-table.git
-cd vibe-table
+git clone https://github.com/idnk2203/4loops.git
+cd 4loops
 ```
 
 There is no install/build step. To exercise changes, enable the plugin from the local marketplace in a scratch workspace:
 
 ```
-/plugin marketplace add /path/to/vibe-table
-/plugin install vt
+/plugin marketplace add /path/to/4loops
+/plugin install 4loops
 ```
 
-Then drive the loop (`/vt:today`, `/vt:board`, …) in that workspace. State lands in `<workspace>/.vibe-table/`.
+Then drive the loop (`/4loops:today`, `/4loops:board`, …) in that workspace. State lands in `<workspace>/.4loops/`.
 
 ## Running tests
 
@@ -50,7 +50,7 @@ Tests must pass before merge. They are plain bash assertions over the scripts an
 Types: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`. Scope is the directory or skill name.
 
 Examples:
-- `feat(skills/recall): add /vt:recall over the archive`
+- `feat(skills/recall): add /4loops:recall over the archive`
 - `fix(hooks/vt-gate): exempt workspace-root docs`
 - `docs(readme): clarify the focus gate`
 

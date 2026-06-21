@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Vibe Table mechanical regression suite. Repo-relative; run from anywhere:
+# 4loops mechanical regression suite. Repo-relative; run from anywhere:
 #   bash tests/run.sh
 # Covers the headline behaviors + regressions for the bugs found in the
 # 2026-05-29 battle-test fan-out. The LIVE behaviors (does CC honor a plugin
@@ -21,7 +21,7 @@ D30=$(date -v-30d +%F 2>/dev/null || date -d '30 days ago' +%F)
 mkboard(){ # $1=VT_DIR ; writes a minimal valid board + dirs
   mkdir -p "$1/.cleared" "$1/archive"
   cat > "$1/board.md" <<EOF
-# Vibe Table
+# 4loops
 
 **Counts:** Backlog 0 · Planning 0 · In Progress 0 · Testing 0 · Done 0
 
@@ -39,7 +39,7 @@ EOF
 }
 
 echo "════ 1. Gate guard (PreToolUse) ════"
-W=$(mktemp -d); VT="$W/.vibe-table"; mkboard "$VT"; : > "$VT/.armed"; : > "$VT/transitions.log"
+W=$(mktemp -d); VT="$W/.4loops"; mkboard "$VT"; : > "$VT/.armed"; : > "$VT/transitions.log"
 mkdir -p "$W/projects/p0/content" "$W/projects/p0/study" "$W/src"; printf '# x\n' > "$W/README.md"
 pj(){ printf '{"session_id":"%s","cwd":"%s","tool_input":{"file_path":"%s"}}' "$1" "$W" "$2"; }
 gate(){ printf '%s' "$1" | bash "$H/vt-gate.sh" 2>&1; }   # echoes deny JSON or nothing
@@ -48,7 +48,7 @@ isdeny(){ printf '%s' "$1" | grep -q '"permissionDecision"[[:space:]]*:[[:space:
 ck "block: stale + gated"        'O=$(gate "$(pj S1 "$W/projects/p0/content/a.md")"); isdeny "$O"'
 ck "allow: exempt study/"        'O=$(gate "$(pj S1 "$W/projects/p0/study/n.md")"); ! isdeny "$O"'
 ck "allow: exempt root *.md"     'O=$(gate "$(pj S1 "$W/README.md")"); ! isdeny "$O"'
-ck "allow: exempt .vibe-table/"  'O=$(gate "$(pj S1 "$W/.vibe-table/board.md")"); ! isdeny "$O"'
+ck "allow: exempt .4loops/"  'O=$(gate "$(pj S1 "$W/.4loops/board.md")"); ! isdeny "$O"'
 ck "allow: non-gated src/"       'O=$(gate "$(pj S1 "$W/src/x.js")"); ! isdeny "$O"'
 : > "$VT/.cleared/S2"
 ck "allow: cleared session"      'O=$(gate "$(pj S2 "$W/projects/p0/content/a.md")"); ! isdeny "$O"'
@@ -57,14 +57,14 @@ rm -f "$VT/.armed"
 ck "allow: on-ramp (unarmed)"    'O=$(gate "$(pj S4 "$W/projects/p0/content/a.md")"); ! isdeny "$O"'
 
 echo "════ 2. Regression: bugs from the 2026-05-29 fan-out ════"
-W2=$(mktemp -d); VT="$W2/.vibe-table"; mkboard "$VT"
+W2=$(mktemp -d); VT="$W2/.4loops"; mkboard "$VT"
 export VT_DIR="$VT"; BOARD="$VT/board.md"; TRANSITIONS="$VT/transitions.log"; PRIORITIES="$VT/current-priorities.md"
 # shellcheck source=/dev/null
 source "$S/vt-priorities-lib.sh"; source "$S/vt-drift-lib.sh"
 # board with three in-progress stories: P0-100 (focused, stale), P0-101 (stale),
 # P0-102 (no transition-log entry)
 cat > "$BOARD" <<EOF
-# Vibe Table
+# 4loops
 
 **Counts:** Backlog 0 · Planning 0 · In Progress 3 · Testing 0 · Done 0
 
@@ -117,7 +117,7 @@ ck "ritual: /today sets Today current"          '[ "$(read_today_stamp)" = "$(is
 unset VT_DIR
 
 echo "════ 3. Sentinel render + malformed-board warn ════"
-W3=$(mktemp -d); VT="$W3/.vibe-table"; mkboard "$VT"; : > "$VT/.armed"; : > "$VT/transitions.log"
+W3=$(mktemp -d); VT="$W3/.4loops"; mkboard "$VT"; : > "$VT/.armed"; : > "$VT/transitions.log"
 cat >> "$VT/board.md" <<EOF
 |  |  | [P0] **P0-007** Hard gate foundation |  |  |
 EOF
@@ -127,7 +127,7 @@ SOUT=$(cd "$W3" && printf '{"session_id":"SR","source":"startup"}' | bash "$H/se
 ck "sentinel: valid JSON"            'printf "%s" "$SOUT" | jq -e . >/dev/null 2>&1'
 C=$(printf '%s' "$SOUT" | jq -r '.hookSpecificOutput.additionalContext')
 ck "sentinel: renders task w/ title" 'printf "%s" "$C" | grep -q "P0-007  Hard gate foundation"'
-ck "sentinel: · header"              'printf "%s" "$C" | grep -q "Vibe Table · "'
+ck "sentinel: · header"              'printf "%s" "$C" | grep -q "4loops · "'
 # break the separator → malformed warn
 sed -i.bak 's/^| ------- | -------- | ----------- | ------- | ---- |$/| - | - | - | - | - |/' "$VT/board.md" && rm -f "$VT/board.md.bak"
 SOUT2=$(cd "$W3" && printf '{"session_id":"SR2","source":"startup"}' | bash "$H/sentinel.sh" 2>/dev/null)
@@ -135,7 +135,7 @@ C2=$(printf '%s' "$SOUT2" | jq -r '.hookSpecificOutput.additionalContext' 2>/dev
 ck "sentinel: malformed-board WARN"  'printf "%s" "$C2" | grep -q "\[WARN\] board.md looks malformed"'
 
 echo "════ 4. Dense board storage (P0-016) ════"
-W4=$(mktemp -d); export VT_DIR="$W4/.vibe-table"
+W4=$(mktemp -d); export VT_DIR="$W4/.4loops"
 for t in a b c d e; do bash "$S/vt-draft.sh" T "$t" >/dev/null; done
 bash "$S/vt-transition.sh" T-002 in-progress >/dev/null
 bash "$S/vt-transition.sh" T-003 testing >/dev/null
@@ -153,7 +153,7 @@ ck "dense: co-located T-004 survives T-002 move"  'grep -q T-004 "$VT_DIR/board.
 unset VT_DIR
 
 echo "════ 5. Carry-over slice + week-start (P0-015) ════"
-W5=$(mktemp -d); export VT_DIR="$W5/.vibe-table"; mkboard "$VT_DIR"; : > "$VT_DIR/transitions.log"
+W5=$(mktemp -d); export VT_DIR="$W5/.4loops"; mkboard "$VT_DIR"; : > "$VT_DIR/transitions.log"
 BOARD="$VT_DIR/board.md"; TRANSITIONS="$VT_DIR/transitions.log"; PRIORITIES="$VT_DIR/current-priorities.md"
 # shellcheck source=/dev/null
 source "$S/vt-priorities-lib.sh"
@@ -203,7 +203,7 @@ ck "detect(root): gates the whole workspace"   'printf "%s" "$DETR" | grep -q "^
 ck "detect(root): no Areas in mono mode"       '! printf "%s" "$DETR" | grep -q "^AREA"'
 rm -rf "$W6r"
 # config writes (idempotent, replace/upsert)
-export VT_DIR="$W6/.vibe-table"
+export VT_DIR="$W6/.4loops"
 "$S/vt-config.sh" week-start sun >/dev/null
 "$S/vt-config.sh" gated 'a/*' 'b/*' >/dev/null
 "$S/vt-config.sh" project PR "Proj One" "me/proj-one" >/dev/null
@@ -230,7 +230,7 @@ ck "gate: Area file not gated"               '! vt_is_gated "$W6/notes/draft.md"
 unset VT_DIR
 
 echo "════ 7. Ship-prep fixes (P0-011) ════"
-W7=$(mktemp -d); export VT_DIR="$W7/.vibe-table"
+W7=$(mktemp -d); export VT_DIR="$W7/.4loops"
 MO=$(date +%Y-%m)
 bash "$S/vt-draft.sh" T "just a backlog item" >/dev/null
 # shellcheck source=/dev/null
@@ -250,8 +250,8 @@ unset VT_DIR
 
 echo
 echo "════ 8. Bash-gate: rm/mv/cp + cd-awareness (v1.1.2) ════"
-W8=$(mktemp -d); mkdir -p "$W8/.vibe-table/.cleared" "$W8/proj/.git" "$W8/proj/sub" "$W8/notes"
-export VT_DIR="$W8/.vibe-table"
+W8=$(mktemp -d); mkdir -p "$W8/.4loops/.cleared" "$W8/proj/.git" "$W8/proj/sub" "$W8/notes"
+export VT_DIR="$W8/.4loops"
 "$S/vt-config.sh" gated 'proj/*' >/dev/null
 : > "$VT_DIR/.armed"
 printf '## Today (2020-01-01)\n\n## Week 1 (2020-01-01 → 01-07)\n' > "$VT_DIR/current-priorities.md"

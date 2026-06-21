@@ -9,7 +9,7 @@
 # header+separator are passed through untouched; only the body rows are re-gridded.
 set -euo pipefail
 
-VT_DIR="${VT_DIR:-./.vibe-table}"
+VT_DIR="${VT_DIR:-./.4loops}"
 BOARD="$VT_DIR/board.md"
 [ -f "$BOARD" ] || exit 0
 

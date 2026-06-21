@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# sentinel.sh — Vibe Table SessionStart hook (premium dashboard render).
+# sentinel.sh — 4loops SessionStart hook (premium dashboard render).
 #
 # Builds ONE dashboard string and emits it as both channels:
 #   - hookSpecificOutput.additionalContext → Claude's context (board state + directives)
@@ -7,7 +7,7 @@
 #     NOT jammed into the "SessionStart startup" status prefix) → the user sees it
 #
 # The dashboard shows board state at a glance: counts, today's tasks (ID + title),
-# this week's tasks, and surfaced drift. The full kanban stays a /vt:board call.
+# this week's tasks, and surfaced drift. The full kanban stays a /4loops:board call.
 #
 # Side effects: auto weekly rollover (armed-gated, idempotent), session-scoped
 # gate clearing (carry across midnight), and marker pruning.
@@ -23,7 +23,7 @@ source "$SCRIPT_DIR/../scripts/vt-guard-lib.sh"
 # shellcheck source=../scripts/vt-drift-lib.sh
 source "$SCRIPT_DIR/../scripts/vt-drift-lib.sh"
 
-# If this workspace doesn't use Vibe Table, exit silently — don't pollute context.
+# If this workspace doesn't use 4loops, exit silently — don't pollute context.
 [ ! -d "$VT_DIR" ] && exit 0
 
 # Read the SessionStart payload; session_id drives gate session-clearing.
@@ -64,16 +64,16 @@ fi
 
 # --- Build ONE premium dashboard string ----------------------------------------
 nl=$'\n'
-D="── Vibe Table · ${WORKSPACE} ──${nl}"
+D="── 4loops · ${WORKSPACE} ──${nl}"
 [ -n "$COUNTS_LINE" ] && D="${D}${COUNTS_LINE}${nl}"
 [ -n "$WARN_LINE" ] && D="${D}${WARN_LINE}${nl}"
 D="${D}${nl}"
 
 if [ "$TODAY_STALE" = true ]; then
   if [ -z "$TODAY_STAMP" ]; then
-    D="${D}[STALE] No Today focus — run /vt:today${nl}"
+    D="${D}[STALE] No Today focus — run /4loops:today${nl}"
   else
-    D="${D}[STALE] Today focus is ${TODAY_STAMP} (today ${ISO_TODAY}) — run /vt:today${nl}"
+    D="${D}[STALE] Today focus is ${TODAY_STAMP} (today ${ISO_TODAY}) — run /4loops:today${nl}"
   fi
 else
   D="${D}Today (${ISO_TODAY})${nl}$(render_focus_lines today || true)${nl}"
@@ -82,9 +82,9 @@ D="${D}${nl}"
 
 if [ "$WEEK_STALE" = true ]; then
   if [ -z "$WEEK_STAMP" ]; then
-    D="${D}[STALE] No Week focus — run /vt:week${nl}"
+    D="${D}[STALE] No Week focus — run /4loops:week${nl}"
   else
-    D="${D}[STALE] Week focus is Week ${WEEK_STAMP} (now Week ${ISO_WEEK}) — run /vt:week, then /vt:today${nl}"
+    D="${D}[STALE] Week focus is Week ${WEEK_STAMP} (now Week ${ISO_WEEK}) — run /4loops:week, then /4loops:today${nl}"
   fi
 else
   D="${D}Week ${ISO_WEEK}${nl}$(render_focus_lines week || true)${nl}"

@@ -5,7 +5,7 @@
 set -euo pipefail
 
 PROJECT="${1:?usage: vt-next-id <project>}"
-VT_DIR="${VT_DIR:-./.vibe-table}"
+VT_DIR="${VT_DIR:-./.4loops}"
 mkdir -p "$VT_DIR/.ids"
 COUNTER_FILE="$VT_DIR/.ids/${PROJECT}.counter"
 

@@ -24,7 +24,7 @@ cwd=$(vt_json_field "$input" '.cwd')
 # No target path on a prompt → resolve the workspace from cwd.
 root=$(vt_find_workspace_root "${cwd:-$PWD}") || exit 0
 [ -z "$root" ] && exit 0
-export VT_DIR="$root/.vibe-table"
+export VT_DIR="$root/.4loops"
 # shellcheck source=../scripts/vt-priorities-lib.sh
 source "$SCRIPTS_DIR/vt-priorities-lib.sh" 2>/dev/null || exit 0
 

@@ -23,9 +23,9 @@ cwd=$(vt_json_field "$input" '.cwd')
 
 abs=$(vt_resolve_abs "$target" "${cwd:-$PWD}")
 root=$(vt_find_workspace_root "$abs") || exit 0
-[ -z "$root" ] && exit 0            # not a Vibe Table workspace
+[ -z "$root" ] && exit 0            # not a 4loops workspace
 
-export VT_DIR="$root/.vibe-table"
+export VT_DIR="$root/.4loops"
 # shellcheck source=../scripts/vt-priorities-lib.sh
 source "$SCRIPTS_DIR/vt-priorities-lib.sh" 2>/dev/null || exit 0
 

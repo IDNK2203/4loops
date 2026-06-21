@@ -24,7 +24,7 @@ USAGE
     ;;
   *)
     new_week_focus="$*"
-    # Freshen ONLY the Week stamp; the day gate stays active until /vt:today runs.
+    # Freshen ONLY the Week stamp; the day gate stays active until /4loops:today runs.
     write_focus_section week "$new_week_focus"
     # Arm the rail; record this session as cleared only if the gate is now fully
     # clear (on a new ISO week, today is usually still stale → not yet cleared).

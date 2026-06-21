@@ -21,7 +21,7 @@ CONTEXT="${CONTEXT//|/│}"
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 "$SCRIPT_DIR/vt-init.sh" >/dev/null
 
-VT_DIR="${VT_DIR:-./.vibe-table}"
+VT_DIR="${VT_DIR:-./.4loops}"
 BOARD="$VT_DIR/board.md"
 
 ID=$("$SCRIPT_DIR/vt-next-id.sh" "$PROJECT")

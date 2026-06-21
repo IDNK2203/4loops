@@ -5,7 +5,7 @@
 # Centralizes: date helpers, current-priorities.md read/write, story-state +
 # title lookups from board.md, carry-forward defaults, activity-slice derivation.
 
-VT_DIR="${VT_DIR:-./.vibe-table}"
+VT_DIR="${VT_DIR:-./.4loops}"
 BOARD="$VT_DIR/board.md"
 PRIORITIES="$VT_DIR/current-priorities.md"
 TRANSITIONS="$VT_DIR/transitions.log"
@@ -16,7 +16,7 @@ iso_week_num()   { date +"%V"; }
 iso_year()       { date +"%G"; }
 
 # ── Week-start config (mon default | sun) ─────────────────────────────────────
-# The first day of the week is configurable per workspace via .vibe-table/config
+# The first day of the week is configurable per workspace via .4loops/config
 # (`week-start: mon|sun`). Default is Monday (ISO). Everything that needs a week
 # boundary — the range label, the staleness number, the rollover marker — routes
 # through the helpers below so the two modes stay coherent.
@@ -296,7 +296,7 @@ render_week_section() {
 
 # Write the whole current-priorities.md file.
 # Args: today_focus week_focus
-# Uses current date/week stamps. Used by /vt:today and /vt:week when the user
+# Uses current date/week stamps. Used by /4loops:today and /4loops:week when the user
 # is explicitly setting (or carry-forward-confirming) focus for the current period.
 write_priorities() {
   local today_focus="$1"
@@ -316,9 +316,9 @@ write_priorities() {
 
 # Write current-priorities.md freshening ONLY the named section's stamp, and
 # PRESERVING the other section's existing stamp (empty stays empty = stale).
-# This is what makes each ritual own its own gate: /vt:today freshens only Today
-# (the week gate is untouched) and /vt:week freshens only Week (the day gate
-# stays active until /vt:today also runs). Args: which=today|week, new_focus.
+# This is what makes each ritual own its own gate: /4loops:today freshens only Today
+# (the week gate is untouched) and /4loops:week freshens only Week (the day gate
+# stays active until /4loops:today also runs). Args: which=today|week, new_focus.
 write_focus_section() {
   local which="$1" new_focus="$2" workspace
   workspace=$(basename "$(pwd)")
@@ -343,7 +343,7 @@ write_focus_section() {
 
 # Refresh ONLY activity slices in current-priorities.md, preserving existing
 # Today/Week stamps + focus selections. Called by vt-transition.sh after every
-# state change so the file doesn't lie between /vt:today invocations.
+# state change so the file doesn't lie between /4loops:today invocations.
 # No-op if current-priorities.md doesn't exist yet.
 refresh_priorities_activity() {
   [ ! -f "$PRIORITIES" ] && return

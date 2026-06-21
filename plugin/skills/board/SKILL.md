@@ -1,11 +1,11 @@
 ---
 name: board
-description: Render the Vibe Table board (kanban of stories by state). Default shows full board as a single horizontal 5-column table (Backlog | Planning | In Progress | Testing | Done), 5 rows per state, with compact cells (ID + title). Slicing flags filter to a single state (full why/context), a custom row cap, or a single project; `--list` gives a vertical view (kanban stays default). Use when the user wants to see the current state of their stories.
+description: Render the 4loops board (kanban of stories by state). Default shows full board as a single horizontal 5-column table (Backlog | Planning | In Progress | Testing | Done), 5 rows per state, with compact cells (ID + title). Slicing flags filter to a single state (full why/context), a custom row cap, or a single project; `--list` gives a vertical view (kanban stays default). Use when the user wants to see the current state of their stories.
 allowed-tools: Bash
 user-invocable: true
 ---
 
-Render the Vibe Table board for the current workspace.
+Render the 4loops board for the current workspace.
 
 ## Usage
 

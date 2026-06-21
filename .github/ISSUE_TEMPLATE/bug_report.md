@@ -22,7 +22,7 @@ What you thought would happen.
 
 ## Environment
 
-- vibe-table (`vt`) version:
+- 4loops version:
 - Claude Code version:
 - OS:
 - Shell:

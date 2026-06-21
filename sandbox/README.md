@@ -1,4 +1,4 @@
-# Vibe Table — Sandbox
+# 4loops — Sandbox
 
 Disposable clean-room workspaces to dogfood `vt` exactly as a fresh user would. The
 script automates the manual fresh-install setup, so the live walkthrough (B1–B5) is one
@@ -40,7 +40,7 @@ globs (`projects/*/{repo-scaffolding,content,gists}/*`), so the rail has real ta
 
 ```
 workspace/
-├── .vibe-table/                    # seeded board (omitted with --empty)
+├── .4loops/                    # seeded board (omitted with --empty)
 ├── projects/acme-demo/
 │   ├── content/post.md             # GATED  → B1 blocks an edit here
 │   ├── repo-scaffolding/README.md  # GATED
@@ -54,7 +54,7 @@ workspace/
   demoable immediately. (The first armed session also performs the weekly rollover, which
   archives the seeded Done story — expected.)
 - `--empty`: no board at all. Confirms `vt` is silent in a non-VT workspace, then you run
-  **`/vt:configure`** — the first-run flow: it detects the mock tree's gated surfaces, you
+  **`/4loops:configure`** — the first-run flow: it detects the mock tree's gated surfaces, you
   confirm projects + week-start, and bootstrap spawns this week's focus. The session should
   end on a board full of your stories, not a template.
 
@@ -66,10 +66,10 @@ workspace/
    = the rail blocking. Then edit `study/notes.md` → **allowed** (exempt). (Drop `jq` off
    `PATH` to prove the `exit 2` fallback also blocks.) Seed files are neutral — the *path* is
    what's gated, so the rail (not the file's text) is what denies.
-3. **B2** — a fresh board has no week stamp (new ISO week), so run `/vt:week` **then**
-   `/vt:today`. Now retry the gated edit in the **same session** → must be **allowed** (the
+3. **B2** — a fresh board has no week stamp (new ISO week), so run `/4loops:week` **then**
+   `/4loops:today`. Now retry the gated edit in the **same session** → must be **allowed** (the
    session-id handshake holds across the lift).
-4. **B5** — `/vt:today` shows the 4-group `multiSelect` (starting / →testing / done / park);
+4. **B5** — `/4loops:today` shows the 4-group `multiSelect` (starting / →testing / done / park);
    selections map back to story IDs.
 5. **B4** (`--real-install` only) — edit a hook header, bump the version in both manifests,
    `/plugin update`, `/reload-plugins`, new session → confirm the new hook runs.

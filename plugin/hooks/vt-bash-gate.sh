@@ -73,7 +73,7 @@ while IFS= read -r t; do
   abs=$(vt_resolve_abs "$t" "$base")
   root=$(vt_find_workspace_root "$abs") || continue
   [ -z "$root" ] && continue
-  export VT_DIR="$root/.vibe-table"
+  export VT_DIR="$root/.4loops"
   # shellcheck source=../scripts/vt-priorities-lib.sh
   source "$SCRIPTS_DIR/vt-priorities-lib.sh" 2>/dev/null || continue
   vt_rail_armed || continue

@@ -18,10 +18,10 @@ user-invocable: true
 This skill reconciles a **configured** board — it must not create a bare one. Check first:
 
 ```bash
-[ -f .vibe-table/config ] && echo CONFIGURED || echo UNCONFIGURED
+[ -f .4loops/config ] && echo CONFIGURED || echo UNCONFIGURED
 ```
 
-If `UNCONFIGURED`, stop here and tell the user: **"No Vibe Table board is configured in this directory yet — run `/vt:configure` first to set up your projects, gates, and focus."** Do not run the steps below.
+If `UNCONFIGURED`, stop here and tell the user: **"No 4loops board is configured in this directory yet — run `/4loops:configure` first to set up your projects, gates, and focus."** Do not run the steps below.
 
 ### 1. Orient: board + drift + carry-forward suggestion
 
@@ -45,7 +45,7 @@ The heart of the ritual: make the board honest *before* setting focus. Build ONE
 3. **"Now done?"** — options = **In Progress + Testing** → `"${CLAUDE_PLUGIN_ROOT}/scripts/vt-transition.sh" <id> done`
 4. **"Park (stale)?"** — options = stale candidates from `vt-drift.sh` → `"${CLAUDE_PLUGIN_ROOT}/scripts/vt-transition.sh" <id> backlog`
 
-Each story belongs in at most one group. Apply the selected transitions in flow order (starting → testing → done → park), looping the script over each ID, then re-render the board. Anything unselected stays put. If all four source sets are empty, skip reconciliation silently — don't manufacture churn. (Brand-new item → `/vt:draft`.)
+Each story belongs in at most one group. Apply the selected transitions in flow order (starting → testing → done → park), looping the script over each ID, then re-render the board. Anything unselected stays put. If all four source sets are empty, skip reconciliation silently — don't manufacture churn. (Brand-new item → `/4loops:draft`.)
 
 Four groups is the `AskUserQuestion` max, so reconcile (here) and focus-set (step 3) stay **two** separate calls. Each question also needs **≥2 options**: if a group's source set has a single story, add a `None — leave as is` option so the call is valid; treat selecting it as a no-op.
 
@@ -63,7 +63,7 @@ For Edit, collect a space-separated ID list (cap 1–3; confirm if more). Sanity
 
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/scripts/vt-today.sh" <ID1> <ID2> ...
-cat .vibe-table/current-priorities.md
+cat .4loops/current-priorities.md
 ```
 
 The script preserves the Week section, refreshes activity slices, **arms the rail** (first run), and **records this session as gate-cleared** when both today and week are fresh. The file IS the message — no extra commentary.
@@ -74,4 +74,4 @@ If the user Skips at step 3, do NOT call the write script. The focus gate stays 
 
 ## Errors
 
-Underlying scripts create `.vibe-table/` on first use. IDs aren't validated by the write script — filter in step 3.
+Underlying scripts create `.4loops/` on first use. IDs aren't validated by the write script — filter in step 3.

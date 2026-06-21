@@ -18,10 +18,10 @@ user-invocable: true
 This skill reconciles a **configured** board — it must not create a bare one. Check first:
 
 ```bash
-[ -f .vibe-table/config ] && echo CONFIGURED || echo UNCONFIGURED
+[ -f .4loops/config ] && echo CONFIGURED || echo UNCONFIGURED
 ```
 
-If `UNCONFIGURED`, stop here and tell the user: **"No Vibe Table board is configured in this directory yet — run `/vt:configure` first to set up your projects, gates, and focus."** Do not run the steps below.
+If `UNCONFIGURED`, stop here and tell the user: **"No 4loops board is configured in this directory yet — run `/4loops:configure` first to set up your projects, gates, and focus."** Do not run the steps below.
 
 ### 1. Orient
 
@@ -42,7 +42,7 @@ Same board-state selector as `/today`. Build ONE `AskUserQuestion` with up to th
 - **Q2 — "Commit to this week from Backlog?"** options = **Backlog** → `"${CLAUDE_PLUGIN_ROOT}/scripts/vt-transition.sh" <id> planning` (scoped for the week; `/today` starts the day's subset).
 - **Q3 — "Stale items to drop/park?"** options = stale stories from `vt-drift.sh` → `"${CLAUDE_PLUGIN_ROOT}/scripts/vt-transition.sh" <id> backlog`.
 
-Loop the transition script over each selected ID, then re-render. The weekly rollover already archived Done + abandoned at session start — confirm nothing important got swept (archive is append-only under `.vibe-table/archive/`, reversible).
+Loop the transition script over each selected ID, then re-render. The weekly rollover already archived Done + abandoned at session start — confirm nothing important got swept (archive is append-only under `.4loops/archive/`, reversible).
 
 ### 3. Set week focus (3–5 anchors)
 
@@ -52,7 +52,7 @@ AskUserQuestion (single-select): Keep [SUGGESTED_FOCUS] / Edit / Skip. Week scop
 
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/scripts/vt-week.sh" <ID1> ... <IDn>
-cat .vibe-table/current-priorities.md
+cat .4loops/current-priorities.md
 ```
 
 Preserves the Today section, refreshes activity slices, arms the rail. Then run `/today` to pick the day's subset.

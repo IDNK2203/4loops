@@ -20,11 +20,11 @@ case "$NEW_STATE" in
   done)        NEW_COL=5 ;;
 esac
 
-VT_DIR="${VT_DIR:-./.vibe-table}"
+VT_DIR="${VT_DIR:-./.4loops}"
 BOARD="$VT_DIR/board.md"
 
 if [ ! -f "$BOARD" ]; then
-  echo "No board yet — run /vt:configure first to set up your board." >&2; exit 1
+  echo "No board yet — run /4loops:configure first to set up your board." >&2; exit 1
 fi
 
 # Find the row + identify current state column + extract content
@@ -99,7 +99,7 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 TS=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 printf "%s\t%s\t%s→%s\n" "$TS" "$ID" "$OLD_STATE" "$NEW_STATE" >> "$VT_DIR/transitions.log"
 
-# Refresh activity slices in current-priorities.md so it doesn't lie between /vt:today runs.
+# Refresh activity slices in current-priorities.md so it doesn't lie between /4loops:today runs.
 # No-op if priorities file doesn't exist yet. Preserves existing stamps + focus.
 # shellcheck source=./vt-priorities-lib.sh
 source "$SCRIPT_DIR/vt-priorities-lib.sh"

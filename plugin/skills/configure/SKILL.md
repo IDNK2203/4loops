@@ -1,11 +1,11 @@
 ---
 name: configure
-description: First-run setup for Vibe Table — detect the projects you track, choose a week-start, confirm which projects the rail guards, then bootstrap your board by spawning this week's focus. Run this once, right after the plugin installs. The aha is the first reconciliation, not a feature tour.
+description: First-run setup for 4loops — detect the projects you track, choose a week-start, confirm which projects the rail guards, then bootstrap your board by spawning this week's focus. Run this once, right after the plugin installs. The aha is the first reconciliation, not a feature tour.
 allowed-tools: Bash, AskUserQuestion, TodoWrite
 user-invocable: true
 ---
 
-`/configure` turns a fresh install into a working board in one guided pass. The thesis: Vibe Table's value is the **habit of pulling your work together and reconciling it** — so this flow drives straight into the first reconciliation rather than touring features. Detect → confirm → write config → **spawn this week's focus** → render.
+`/configure` turns a fresh install into a working board in one guided pass. The thesis: 4loops's value is the **habit of pulling your work together and reconciling it** — so this flow drives straight into the first reconciliation rather than touring features. Detect → confirm → write config → **spawn this week's focus** → render.
 
 ## Usage
 
@@ -72,7 +72,7 @@ The rail blocks writes to a tracked project until you've reconciled, so it's use
 "${CLAUDE_PLUGIN_ROOT}/scripts/vt-config.sh" gated <glob1> <glob2> ...
 ```
 
-This **replaces** the built-in default glob set — once written, only these globs gate. (The hard-exempt surfaces — `.vibe-table/`, `study/`, `learnings/`, root `*.md`, `.env` — always flow, even inside a gated project, so the ritual can never block itself.)
+This **replaces** the built-in default glob set — once written, only these globs gate. (The hard-exempt surfaces — `.4loops/`, `study/`, `learnings/`, root `*.md`, `.env` — always flow, even inside a gated project, so the ritual can never block itself.)
 
 Show the final config: `"${CLAUDE_PLUGIN_ROOT}/scripts/vt-config.sh" show`.
 
@@ -103,16 +103,16 @@ This is the aha. Don't tour; **fill the board with the user's real work.**
 
 Make the finish a *moment* — the first reconciliation is the aha, so mark it:
 
-1. Say it plainly: **"🎉 Vibe Table is configured — your board is live."**
+1. Say it plainly: **"🎉 4loops is configured — your board is live."**
 2. Render the board (the payoff):
    ```bash
    "${CLAUDE_PLUGIN_ROOT}/scripts/vt-render.sh"
-   cat .vibe-table/current-priorities.md
+   cat .4loops/current-priorities.md
    ```
-3. One line on the loop, and nothing more: **"From here: `/vt:today` each day to reconcile, `/vt:week` each week to anchor. Move stories with `/vt:start` · `/vt:test` · `/vt:done`, or just ask me to move them."**
+3. One line on the loop, and nothing more: **"From here: `/4loops:today` each day to reconcile, `/4loops:week` each week to anchor. Move stories with `/4loops:start` · `/4loops:test` · `/4loops:done`, or just ask me to move them."**
 4. Mark the final todo `completed`.
 
-It lives in `.vibe-table/` at your workspace root and re-renders at the start of every session via the sentinel. **Do not** narrate an on-ramp or feature list — the board they just filled plus that one-line loop *is* the whole message.
+It lives in `.4loops/` at your workspace root and re-renders at the start of every session via the sentinel. **Do not** narrate an on-ramp or feature list — the board they just filled plus that one-line loop *is* the whole message.
 
 ## Notes
 

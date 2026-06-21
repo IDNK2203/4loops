@@ -12,7 +12,7 @@ What workflow pain does this address? What do you do today, and why is it bad?
 
 ## Proposed solution
 
-What should vibe-table do? If you have a specific skill/hook shape in mind, sketch it.
+What should 4loops do? If you have a specific skill/hook shape in mind, sketch it.
 
 ## Alternatives considered
 

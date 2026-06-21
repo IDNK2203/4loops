@@ -2,7 +2,7 @@
 # vt-refresh-counts.sh — scan kanban rows in board.md and update **Counts:** line.
 set -euo pipefail
 
-VT_DIR="${VT_DIR:-./.vibe-table}"
+VT_DIR="${VT_DIR:-./.4loops}"
 BOARD="$VT_DIR/board.md"
 
 [ ! -f "$BOARD" ] && exit 0

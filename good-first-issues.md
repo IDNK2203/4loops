@@ -8,13 +8,13 @@ Seed these as actual GitHub issues at repo launch with the `good first issue` la
 
 **Label**: `good first issue`, `enhancement`
 
-**Why**: The PreToolUse gate's default gated surfaces are `projects/*/repo-scaffolding/*`, `projects/*/content/*`, `projects/*/gists/*` — a layout specific to one workspace. A fresh user's gate matches nothing useful unless they hand-write `.vibe-table/config`. The default should be universal (or opt-in), with config documented.
+**Why**: The PreToolUse gate's default gated surfaces are `projects/*/repo-scaffolding/*`, `projects/*/content/*`, `projects/*/gists/*` — a layout specific to one workspace. A fresh user's gate matches nothing useful unless they hand-write `.4loops/config`. The default should be universal (or opt-in), with config documented.
 
 **Where**: `vt_gated_globs()` in `plugin/scripts/vt-guard-lib.sh`.
 
 **Acceptance**:
 - A fresh workspace gets a sensible default (or a clearly-documented opt-in)
-- `.vibe-table/config` `gated:` override behavior is documented in the README
+- `.4loops/config` `gated:` override behavior is documented in the README
 - `tests/run.sh` covers the default + an override case
 
 **Size**: ~30 lines.
@@ -38,16 +38,16 @@ Seed these as actual GitHub issues at repo launch with the `good first issue` la
 
 ---
 
-## #3 — Implement `/vt:recall` over the archive
+## #3 — Implement `/4loops:recall` over the archive
 
 **Label**: `good first issue`, `enhancement`
 
-**Why**: Closed and abandoned stories live in `.vibe-table/archive/` and every transition in `transitions.log`, but there is no way to query them. A `/vt:recall` makes past work retrievable.
+**Why**: Closed and abandoned stories live in `.4loops/archive/` and every transition in `transitions.log`, but there is no way to query them. A `/4loops:recall` makes past work retrievable.
 
 **Where**: new `plugin/skills/recall/SKILL.md` + `plugin/scripts/vt-recall.sh`; register in `plugin/.claude-plugin/plugin.json`.
 
 **Acceptance**:
-- `/vt:recall <query>` searches `archive/*/closed.md` + `abandoned.md` + `transitions.log`
+- `/4loops:recall <query>` searches `archive/*/closed.md` + `abandoned.md` + `transitions.log`
 - Supports `--project`, `--state`, `--since`
 - A `tests/run.sh` case asserts a known archived ID is found
 

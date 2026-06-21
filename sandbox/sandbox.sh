@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# sandbox.sh — disposable clean-room workspaces to dogfood vibe-table as a fresh user.
+# sandbox.sh — disposable clean-room workspaces to dogfood 4loops as a fresh user.
 #
 # Two modes (config fidelity × persistence) and two install paths — see sandbox/README.md.
 #   --light     ephemeral /tmp + real config (--plugin-dir). Fast inner loop.
@@ -18,7 +18,7 @@ PLUGIN_DIR="$REPO/plugin"
 PLUGIN_SCRIPTS="$PLUGIN_DIR/scripts"
 TMP_BASE="/tmp"
 PERSIST_BASE="$HOME/Ship/vt-sandbox"
-MARKETPLACE="vibe-table"   # must match .claude-plugin/marketplace.json "name"
+MARKETPLACE="4loops"   # must match .claude-plugin/marketplace.json "name"
 
 # ── Defaults (set by parse_new_args) ────────────────────────────────────────────
 # Default to --light: it keeps your real auth (no --bare → keychain/OAuth intact),
@@ -33,7 +33,7 @@ die() { printf 'sandbox: %s\n' "$*" >&2; exit 1; }
 
 usage() {
   cat <<'EOF'
-sandbox.sh — clean-room workspaces for dogfooding vibe-table
+sandbox.sh — clean-room workspaces for dogfooding 4loops
 
 USAGE
   sandbox.sh new [--light|--isolated] [--real-install] [--empty|--seeded] [name]
@@ -53,7 +53,7 @@ INSTALL (isolated only)
 
 SEED
   --seeded     (default) stories across states + pre-armed rail + stale focus (B1 demoable now)
-  --empty      virgin workspace (no board) — walk /vt:draft → /vt:today from scratch
+  --empty      virgin workspace (no board) — walk /4loops:draft → /4loops:today from scratch
 EOF
 }
 
@@ -118,7 +118,7 @@ write_settings() {  # <config-dir> — injection settings (directory-source mark
   "extraKnownMarketplaces": {
     "$MARKETPLACE": { "source": { "source": "directory", "path": "$REPO" } }
   },
-  "enabledPlugins": { "vt@$MARKETPLACE": true }
+  "enabledPlugins": { "4loops@$MARKETPLACE": true }
 }
 EOF
 }
@@ -155,7 +155,7 @@ print_launch() {  # <root> <workspace>
     isolated/real)
       echo "  export HOME=\"$root/config\""
       echo "  claude plugin marketplace add \"$REPO\""
-      echo "  claude plugin install vt@$MARKETPLACE"
+      echo "  claude plugin install 4loops@$MARKETPLACE"
       echo "  cd \"$ws\" && HOME=\"$root/config\" claude"
       echo
       echo "  ⚠  \$HOME override may not resolve the macOS login keychain → if it shows"
@@ -164,14 +164,14 @@ print_launch() {  # <root> <workspace>
   esac
   echo
   if [ "$EMPTY" = true ]; then
-    echo "Walk (virgin): confirm vt is SILENT (no .vibe-table yet) → /vt:configure"
+    echo "Walk (virgin): confirm 4loops is SILENT (no .4loops yet) → /4loops:configure"
     echo "       (detect → confirm projects/week-start/gated → bootstrap spawns this week's focus)."
   else
     echo "Walk:  sentinel renders (B3)"
     echo "       · ATTEMPT an Edit to projects/acme-demo/content/post.md (don't pre-judge it)"
     echo "         → the Edit tool returns the PreToolUse hook denial = B1, the thesis"
     echo "       · edit study/notes.md → allowed (exempt)"
-    echo "       · /vt:week THEN /vt:today (fresh board = new ISO week, both needed) → retry"
+    echo "       · /4loops:week THEN /4loops:today (fresh board = new ISO week, both needed) → retry"
     echo "         the gated edit, same session → now allowed = B2"
     echo "       · the reconciliation shows the multiSelect groups, labels → IDs = B5"
     [ "$INSTALL" = real ] && echo "       · bump version → /plugin update → /reload-plugins → new hooks run (B4)"
@@ -208,7 +208,7 @@ cmd_new() {
   ws="$root/workspace"
   mkdir -p "$ws"
   scaffold_mock "$ws"
-  [ "$EMPTY" = false ] && seed_board "$ws/.vibe-table"
+  [ "$EMPTY" = false ] && seed_board "$ws/.4loops"
   write_meta "$root"
   case "$MODE/$INSTALL" in
     isolated/inject) write_settings "$root/config" ;;
@@ -224,8 +224,8 @@ cmd_refresh() {
   # shellcheck disable=SC1091
   . "$root/.sandbox-meta"   # restores MODE/INSTALL/EMPTY/REPO
   ws="$root/workspace"
-  rm -rf "$ws/.vibe-table"
-  [ "${EMPTY:-false}" = false ] && seed_board "$ws/.vibe-table"
+  rm -rf "$ws/.4loops"
+  [ "${EMPTY:-false}" = false ] && seed_board "$ws/.4loops"
   echo "✓ refreshed '$name' — board reset to seed ($root)"
 }
 
@@ -233,17 +233,17 @@ cmd_expire() {  # backdate Today's stamp so a reconciled board reads stale → g
   local name="${1:-}" root vt pri y
   [ -z "$name" ] && die "usage: sandbox expire <name>"
   root="$(find_sandbox "$name")" || die "no sandbox '$name'"
-  vt="$root/workspace/.vibe-table"
+  vt="$root/workspace/.4loops"
   pri="$vt/current-priorities.md"
-  [ -f "$pri" ] || die "no current-priorities.md in '$name' — run /vt:configure (or /vt:today) first"
+  [ -f "$pri" ] || die "no current-priorities.md in '$name' — run /4loops:configure (or /4loops:today) first"
   y=$(date -v-1d +%F 2>/dev/null || date -d 'yesterday' +%F)
-  # Backdate ONLY Today (leave Week current) so a single /vt:today lifts the gate
+  # Backdate ONLY Today (leave Week current) so a single /4loops:today lifts the gate
   # again — the clean B1 (blocked) → B2 (allowed-same-session) demo.
   sed -i.bak -E "s/## Today \([0-9-]+\)/## Today ($y)/" "$pri" && rm -f "$pri.bak"
   : > "$vt/.armed"   # the gate only enforces once armed
   echo "✓ expired '$name' — Today backdated to $y; the rail is now ACTIVE for any NEW session."
   echo "  Demo: start a FRESH session (the /configure session stays cleared by design) →"
-  echo "  attempt an Edit to a gated path → BLOCKED (B1); run /vt:today → retry → ALLOWED (B2)."
+  echo "  attempt an Edit to a gated path → BLOCKED (B1); run /4loops:today → retry → ALLOWED (B2)."
 }
 
 cmd_list() {

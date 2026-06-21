@@ -26,14 +26,14 @@ suggest_prefix() {
   printf '%s' "${p:0:3}"
 }
 
-# Collect git repos (excluding node_modules/.vibe-table), separating the
+# Collect git repos (excluding node_modules/.4loops), separating the
 # workspace's OWN root repo from nested ones — they imply different shapes:
 #   nested repos present        → workspace mode (each nested repo is a project)
 #   no nested but root is a repo → mono/root mode (the root IS the single project)
 # A git repo is the high-confidence auto-suggest; /configure lets the user promote
 # an Area or demote a suggestion. We do NOT treat a bare marker file on its own
 # as a project (that wrongly tracked plain doc folders) — track at the repo boundary.
-ALL_GITS=$(find "$ROOT" -maxdepth 4 \( -name node_modules -o -name .vibe-table \) -prune \
+ALL_GITS=$(find "$ROOT" -maxdepth 4 \( -name node_modules -o -name .4loops \) -prune \
      -o -type d -name .git -print 2>/dev/null)
 NESTED=""; ROOT_IS_REPO=0
 while IFS= read -r g; do
@@ -76,7 +76,7 @@ EOF
       case "$name" in .*|node_modules|dist|build|public) continue ;; esac
       # No `| head`: under set -e + pipefail, head SIGPIPEs find and aborts. Let
       # find complete (exit 0); emptiness ⇒ no repo inside ⇒ an Area.
-      found=$(find "$d" -maxdepth 4 \( -name node_modules -o -name .vibe-table \) -prune \
+      found=$(find "$d" -maxdepth 4 \( -name node_modules -o -name .4loops \) -prune \
                    -o -type d -name .git -print 2>/dev/null)
       # `if` (not `&&`): a short-circuiting trailing `&&` makes the loop/pipeline
       # exit non-zero, which set -e would treat as fatal.

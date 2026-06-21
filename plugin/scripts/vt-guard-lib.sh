@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# vt-guard-lib.sh — enforcement helpers for the Vibe Table hard rail.
+# vt-guard-lib.sh — enforcement helpers for the 4loops hard rail.
 # Sourced by the PreToolUse guards (vt-gate.sh, vt-bash-gate.sh) and the
 # UserPromptSubmit nudge (vt-prompt-gate.sh). NOT directly invocable.
 #
@@ -31,7 +31,7 @@ vt_json_field() {
 }
 
 # ── Workspace root resolution ────────────────────────────────────────────────
-# Walk UP from a target path until a directory containing .vibe-table/ is found.
+# Walk UP from a target path until a directory containing .4loops/ is found.
 # Echoes the workspace root, or returns 1 if none (→ not a VT workspace).
 # Resolves from the TARGET (a PreToolUse hook's file may be outside cwd).
 vt_find_workspace_root() {
@@ -39,10 +39,10 @@ vt_find_workspace_root() {
   [ -z "$p" ] && return 1
   if [ -d "$p" ]; then d="$p"; else d="$(dirname "$p")"; fi
   while [ -n "$d" ] && [ "$d" != "/" ] && [ "$d" != "." ]; do
-    [ -d "$d/.vibe-table" ] && { printf '%s' "$d"; return 0; }
+    [ -d "$d/.4loops" ] && { printf '%s' "$d"; return 0; }
     d="$(dirname "$d")"
   done
-  [ -d "/.vibe-table" ] && { printf '%s' "/"; return 0; }
+  [ -d "/.4loops" ] && { printf '%s' "/"; return 0; }
   return 1
 }
 
@@ -56,9 +56,9 @@ vt_resolve_abs() {
 }
 
 # ── First-run on-ramp (rail-armed state) ─────────────────────────────────────
-# The rail is "armed" once the first ritual (/vt:today) has run. Until then the
+# The rail is "armed" once the first ritual (/4loops:today) has run. Until then the
 # guard allows (one-time install grace) so a fresh workspace doesn't block from
-# minute one. The sentinel renders the "rail arms after your first /vt:today"
+# minute one. The sentinel renders the "rail arms after your first /4loops:today"
 # notice during grace. VT_DIR must be set before calling.
 vt_rail_armed() { [ -f "$VT_DIR/.armed" ]; }
 vt_arm_rail()   { : > "$VT_DIR/.armed" 2>/dev/null || true; }
@@ -67,7 +67,7 @@ vt_arm_rail()   { : > "$VT_DIR/.armed" 2>/dev/null || true; }
 # A session that has seen the gate clear (ran the ritual, or started/acted on a
 # fresh day) is marked; it is NEVER re-blocked for its lifetime, even past
 # midnight. This is the precise replacement for DevOS's blunt 18h grace.
-# Marker = empty file .vibe-table/.cleared/<session_id> (mtime = when cleared).
+# Marker = empty file .4loops/.cleared/<session_id> (mtime = when cleared).
 # session_id is stable across `claude -r`/--continue (verified); /fork mints a
 # new id and correctly re-gates.
 vt_cleared_dir() { printf '%s' "$VT_DIR/.cleared"; }
@@ -104,7 +104,7 @@ vt_prune_cleared() {
 vt_is_exempt() {
   local abs="$1" root="$2" rel="${1#"$2"/}"
   case "$abs" in
-    "$root"/.vibe-table|"$root"/.vibe-table/*) return 0 ;;
+    "$root"/.4loops|"$root"/.4loops/*) return 0 ;;
     "$root"/.claude|"$root"/.claude/*)          return 0 ;;
     "$root"/inbox/*|"$root"/reviews/*)          return 0 ;;
   esac
@@ -122,7 +122,7 @@ vt_is_exempt() {
 }
 
 # The gated globs (product/deliverable surfaces), root-relative. Default =
-# Build + Share. Overridable per workspace via .vibe-table/config (`gated: <glob>`
+# Build + Share. Overridable per workspace via .4loops/config (`gated: <glob>`
 # lines) — config may narrow/widen but the exempt list above always wins.
 vt_gated_globs() {
   local cfg="$VT_DIR/config" globs=""
@@ -162,11 +162,11 @@ vt_log_override() {
 vt_gate_directive() {
   local lead
   if ! week_stamp_current "$(read_week_stamp)"; then
-    lead="It's a new week — run /vt:week, then /vt:today, to reconcile the board and set focus."
+    lead="It's a new week — run /4loops:week, then /4loops:today, to reconcile the board and set focus."
   else
-    lead="Today's focus is stale — run /vt:today to reconcile the board and set today's focus."
+    lead="Today's focus is stale — run /4loops:today to reconcile the board and set today's focus."
   fi
-  printf '%s' "Vibe Table gate (focus stale). ${lead} That reconciliation IS your priority-setting and it lifts this gate. Reading, search, and notes (.vibe-table/, study/, learnings/, inbox/) are never blocked. One-time bypass for THIS single action (logged): re-run prefixed with VT_ALLOW_STALE_GATE=1."
+  printf '%s' "4loops gate (focus stale). ${lead} That reconciliation IS your priority-setting and it lifts this gate. Reading, search, and notes (.4loops/, study/, learnings/, inbox/) are never blocked. One-time bypass for THIS single action (logged): re-run prefixed with VT_ALLOW_STALE_GATE=1."
 }
 
 # Emit a PreToolUse deny. Canonical = exit 0 + hookSpecificOutput JSON; falls

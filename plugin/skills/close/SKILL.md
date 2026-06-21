@@ -28,7 +28,7 @@ Pass the drift report through. Optionally ask the user for a one-line retro and 
 "${CLAUDE_PLUGIN_ROOT}/scripts/vt-close.sh" --weekly
 ```
 
-Echo the rollover summary (`N closed, N abandoned → archive/YYYY-MM/`). This normally fires automatically at the first session of a new ISO week (the sentinel does it); the flag is only for running it early or re-confirming. The archive is append-only under `.vibe-table/archive/` and reversible.
+Echo the rollover summary (`N closed, N abandoned → archive/YYYY-MM/`). This normally fires automatically at the first session of a new ISO week (the sentinel does it); the flag is only for running it early or re-confirming. The archive is append-only under `.4loops/archive/` and reversible.
 
 ## Notes
 

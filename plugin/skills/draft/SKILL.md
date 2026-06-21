@@ -1,6 +1,6 @@
 ---
 name: draft
-description: Create a new story-draft in the Vibe Table Backlog. Story-drafts are lightweight contribution units that live in the backlog until promoted by a Story Authoring skill. Usage `/draft <title> --project <P> [--why <line>] [--context <path>]`. Use when the user wants to capture a new piece of work as a tracked story.
+description: Create a new story-draft in the 4loops Backlog. Story-drafts are lightweight contribution units that live in the backlog until promoted by a Story Authoring skill. Usage `/draft <title> --project <P> [--why <line>] [--context <path>]`. Use when the user wants to capture a new piece of work as a tracked story.
 allowed-tools: Bash, AskUserQuestion
 user-invocable: true
 ---
@@ -23,16 +23,16 @@ Create a new story-draft in the Backlog.
 Drafting adds a story to a **configured** board — it must not create a bare one. Check first:
 
 ```bash
-[ -f .vibe-table/config ] && echo CONFIGURED || echo UNCONFIGURED
+[ -f .4loops/config ] && echo CONFIGURED || echo UNCONFIGURED
 ```
 
-If `UNCONFIGURED`, stop here and tell the user: **"No Vibe Table board is configured in this directory yet — run `/vt:configure` first to set up your projects, gates, and focus."** Do not run the steps below. (This skill is also invoked internally by `/vt:configure`'s bootstrap, which calls the `vt-draft.sh` script directly and is unaffected by this guard.)
+If `UNCONFIGURED`, stop here and tell the user: **"No 4loops board is configured in this directory yet — run `/4loops:configure` first to set up your projects, gates, and focus."** Do not run the steps below. (This skill is also invoked internally by `/4loops:configure`'s bootstrap, which calls the `vt-draft.sh` script directly and is unaffected by this guard.)
 
 ### 1. Parse args from the user's message
 
 Extract `<title>`, `--project`, `--why`, `--context`. Title is the first positional arg, the rest are flags.
 
-If `--project` is missing → use AskUserQuestion to prompt for it (single-select with the project IDs detected in `.vibe-table/.ids/` if any exist, plus "Other"; if none exist, free-text prompt).
+If `--project` is missing → use AskUserQuestion to prompt for it (single-select with the project IDs detected in `.4loops/.ids/` if any exist, plus "Other"; if none exist, free-text prompt).
 
 If `--why` is missing → use AskUserQuestion: "Why does this matter? (one line so future-you understands the draft)". This field is heavily recommended; only skip if the user explicitly says to.
 
