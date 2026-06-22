@@ -120,8 +120,8 @@ story_title() {
           cell = cells[i]
           # Strip leading " [PROJ] **ID** "
           sub(/^ *\[[^]]*\] \*\*[^*]*\*\* */, "", cell)
-          # Strip trailing metadata: " — why: ..." / " — context: ..." / " — type: ..."
-          sub(/ — (why|context|type):.*/, "", cell)
+          # Strip trailing metadata: " — why:/context:/type:/due: ..."
+          sub(/ — (why|context|type|due):.*/, "", cell)
           gsub(/^ +| +$/, "", cell)
           print cell
           exit
@@ -145,6 +145,20 @@ story_type() {
         if (t == "dev" || t == "modeling") { print t; exit }
       }
       print "dev"; exit
+    }
+  ' "$BOARD"
+}
+
+# Return a story's deadline (YYYY-MM-DD) or empty. ASCII-anchored match keeps
+# RSTART/RLENGTH byte-safe past the multibyte em-dash. (W7: deadlines drive
+# prioritization + drift.)
+story_deadline() {
+  local id="$1"
+  [ ! -f "$BOARD" ] && return
+  awk -v id="$id" '
+    index($0, "**" id "**") {
+      if (match($0, /due: [0-9]+-[0-9]+-[0-9]+/)) print substr($0, RSTART + 5, 10)  # "due: " = 5 ASCII bytes
+      exit
     }
   ' "$BOARD"
 }

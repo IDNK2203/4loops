@@ -384,5 +384,21 @@ ck "arrange: both land in Backlog (2 rows)"    '[ "$(grep -cE "ship the thing|mo
 ck "arrange: skill is user-invoked only"       'grep -q "disable-model-invocation: true" "$PLUGIN/skills/arrange/SKILL.md"'
 unset VT_DIR
 
+echo
+echo "════ 15. Capture: deadline + context-as-link (W7, v2) ════"
+W15=$(mktemp -d); export VT_DIR="$W15/.4loops"
+# shellcheck source=/dev/null
+source "$S/vt-priorities-lib.sh"
+D1=$(bash "$S/vt-draft.sh" P0 "ship by friday" "" "stories/vibe-table/15-v2-spine/README.md" --deadline 2026-07-01 | grep -oE 'P0-[0-9]+')
+ck "deadline: row carries due token"          'grep "'"$D1"'" "$VT_DIR/board.md" | grep -q "due: 2026-07-01"'
+ck "deadline: story_deadline reads it"        '[ "$(story_deadline "'"$D1"'")" = "2026-07-01" ]'
+ck "deadline: story_title excludes due token" '[ "$(story_title "'"$D1"'")" = "ship by friday" ]'
+ck "context: renders as markdown link"        'grep "'"$D1"'" "$VT_DIR/board.md" | grep -q "\[15-v2-spine\](stories/vibe-table/15-v2-spine/README.md)"'
+D2=$(bash "$S/vt-draft.sh" P0 "bad deadline" --deadline notadate 2>/dev/null | grep -oE 'P0-[0-9]+')
+ck "deadline: invalid dropped, story created" 'grep -q "'"$D2"'" "$VT_DIR/board.md" && [ -z "$(story_deadline "'"$D2"'")" ]'
+D3=$(bash "$S/vt-draft.sh" P0 "freeform ctx" "" "just some prose not a path" | grep -oE 'P0-[0-9]+')
+ck "context: free text is not linkified"      '! grep "'"$D3"'" "$VT_DIR/board.md" | grep -q "]("'
+unset VT_DIR
+
 echo "════ RESULT: $P passed, $F failed ════"
 [ "$F" -eq 0 ]

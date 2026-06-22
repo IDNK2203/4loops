@@ -12,21 +12,29 @@ set -euo pipefail
 # Pull the --type flag out of anywhere in the arg list; the rest stay positional.
 TYPE="dev"
 BACKDATE=""
+DEADLINE=""
 ARGS=()
 while [ $# -gt 0 ]; do
   case "$1" in
     --type)     TYPE="${2:-dev}"; shift 2 ;;
     --backdate) BACKDATE="${2:-}"; shift 2 ;;
+    --deadline) DEADLINE="${2:-}"; shift 2 ;;
     *)          ARGS+=("$1"); shift ;;
   esac
 done
 set -- ${ARGS[@]+"${ARGS[@]}"}
 
-PROJECT="${1:?usage: vt-draft <project> <title> [why] [context] [--type dev|modeling]}"
-TITLE="${2:?usage: vt-draft <project> <title> [why] [context] [--type dev|modeling]}"
+USAGE="usage: vt-draft <project> <title> [why] [context] [--type dev|modeling] [--deadline YYYY-MM-DD] [--backdate YYYY-MM-DD]"
+PROJECT="${1:?$USAGE}"
+TITLE="${2:?$USAGE}"
 WHY="${3:-}"
 CONTEXT="${4:-}"
 case "$TYPE" in dev|modeling) ;; *) TYPE="dev" ;; esac
+# A deadline drives prioritization + drift; validate, warn+drop if malformed.
+case "$DEADLINE" in
+  ''|[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]) ;;
+  *) echo "warn: ignoring invalid --deadline '$DEADLINE' (want YYYY-MM-DD)." >&2; DEADLINE="" ;;
+esac
 
 # The board is parsed with awk -F'|', so a real '|' in any field — even
 # backslash-escaped — splits the row and truncates the cell (+ its archive
@@ -45,10 +53,28 @@ BOARD="$VT_DIR/board.md"
 
 ID=$("$SCRIPT_DIR/vt-next-id.sh" "$PROJECT")
 
+# Render context as a clean markdown link when it looks like a doc path/URL (it
+# IS a document — a link renders better than a bare path, esp. in board exports);
+# otherwise keep it as a code span. Label = the doc's slug (parent dir for README).
+ctx_render() {
+  local p="$1" base
+  case "$p" in
+    */*|http*|*.md|*.markdown|*.txt)
+      p="${p%/}"; base="${p##*/}"
+      case "$base" in README*|readme*|index*|INDEX*) base="${p%/*}"; base="${base##*/}" ;; esac
+      base="${base%.*}"
+      [ -z "$base" ] && base="link"
+      printf '[%s](%s)' "$base" "$1"
+      ;;
+    *) printf '`%s`' "$1" ;;
+  esac
+}
+
 CELL="[${PROJECT}] **${ID}** ${TITLE}"
 [ "$TYPE" != "dev" ] && CELL="${CELL} — type: ${TYPE}"
+[ -n "$DEADLINE" ] && CELL="${CELL} — due: ${DEADLINE}"
 [ -n "$WHY" ] && CELL="${CELL} — why: ${WHY}"
-[ -n "$CONTEXT" ] && CELL="${CELL} — context: \`${CONTEXT}\`"
+[ -n "$CONTEXT" ] && CELL="${CELL} — context: $(ctx_render "$CONTEXT")"
 
 # Auto-register project in Projects table if not already present
 PROJECT_EXISTS=$(awk -v proj="$PROJECT" -F'|' '

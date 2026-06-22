@@ -70,7 +70,7 @@ awk -F'|' \
     # A modeling story gets a ◆ glance-marker so the board reads honestly at a
     # glance (detected before the metadata tail is stripped).
     mark = (c ~ /type: modeling/) ? "◆ " : ""
-    sub(/ — (why|context|type):.*/, "", c)
+    sub(/ — (why|context|type|due):.*/, "", c)
     if (match(c, /^\[[^]]*\] \*\*[^*]*\*\* /)) {
       p = substr(c, 1, RLENGTH); t = substr(c, RLENGTH + 1)
       if (length(t) > MAXTITLE) t = substr(t, 1, MAXTITLE - 1) "…"
