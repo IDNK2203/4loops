@@ -400,5 +400,33 @@ D3=$(bash "$S/vt-draft.sh" P0 "freeform ctx" "" "just some prose not a path" | g
 ck "context: free text is not linkified"      '! grep "'"$D3"'" "$VT_DIR/board.md" | grep -q "]("'
 unset VT_DIR
 
+echo
+echo "════ 16. Deadline-aware drift (W8, v2) ════"
+W16=$(mktemp -d); export VT_DIR="$W16/.4loops"; mkboard "$VT_DIR"; : > "$VT_DIR/transitions.log"
+BOARD="$VT_DIR/board.md"; TRANSITIONS="$VT_DIR/transitions.log"; PRIORITIES="$VT_DIR/current-priorities.md"
+# shellcheck source=/dev/null
+source "$S/vt-priorities-lib.sh"; source "$S/vt-drift-lib.sh"
+PAST=$(date -v-5d +%F 2>/dev/null || date -d '5 days ago' +%F)
+SOON=$(date -v+2d +%F 2>/dev/null || date -d '2 days' +%F)
+FAR=$(date -v+30d +%F 2>/dev/null || date -d '30 days' +%F)
+cat >> "$BOARD" <<EOF
+|  |  | [P0] **P0-300** overdue thing — due: $PAST |  |  |
+|  |  | [P0] **P0-301** soon thing — due: $SOON |  |  |
+|  |  | [P0] **P0-302** far thing — due: $FAR |  |  |
+|  |  |  |  | [P0] **P0-303** done thing — due: $PAST |
+EOF
+OV=$(find_overdue)
+ck "overdue: flags past-due active story"  'printf "%s" "$OV" | grep -q "P0-300"'
+ck "overdue: ignores far-future story"     '! printf "%s" "$OV" | grep -q "P0-302"'
+ck "overdue: ignores DONE story"           '! printf "%s" "$OV" | grep -q "P0-303"'
+SOONOUT=$(find_due_soon 3)
+ck "due-soon: flags story due within 3d"   'printf "%s" "$SOONOUT" | grep -q "P0-301"'
+ck "due-soon: excludes far-future"         '! printf "%s" "$SOONOUT" | grep -q "P0-302"'
+ck "due-soon: excludes already-overdue"    '! printf "%s" "$SOONOUT" | grep -q "P0-300"'
+DR=$(render_drift)
+ck "drift line: surfaces overdue"          'printf "%s" "$DR" | grep -q "overdue"'
+ck "drift line: surfaces due-soon"         'printf "%s" "$DR" | grep -q "due-soon"'
+unset VT_DIR
+
 echo "════ RESULT: $P passed, $F failed ════"
 [ "$F" -eq 0 ]

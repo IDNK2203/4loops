@@ -11,6 +11,7 @@
 DRIFT_CAP="${VT_DRIFT_CAP:-25}"
 DRIFT_STALE_DAYS="${VT_DRIFT_STALE_DAYS:-14}"
 DRIFT_ABANDON_DAYS="${VT_DRIFT_ABANDON_DAYS:-21}"
+DRIFT_DUE_SOON_DAYS="${VT_DRIFT_DUE_SOON_DAYS:-3}"
 
 # Emit one line per story row: "<ID>\t<state>\t<cell-content>".
 board_rows() {
@@ -92,12 +93,46 @@ find_abandoned() {
     done
 }
 
+# Active (non-done) stories whose deadline is in the past. "<id> <due> <Nd over>".
+# Off-plan signal — a story you said you'd finish by a date that has slipped.
+# Integer date compare (YYYYMMDD) avoids non-portable string `<` in test.
+find_overdue() {
+  local today_n id st due
+  today_n=$(iso_today); today_n=${today_n//-/}
+  board_rows | awk -F'\t' '$2!="done"{print $1"\t"$2}' \
+  | while IFS=$'\t' read -r id st; do
+      [ -z "$id" ] && continue
+      due=$(story_deadline "$id"); [ -z "$due" ] && continue
+      [ "${due//-/}" -lt "$today_n" ] && printf '%s %s %dd over\n' "$id" "$due" "$(days_since "$due")"
+    done
+}
+
+# Active stories due within the next N days (today..today+N). "<id> <due>".
+# Drifting-soon signal — surface in reconciliation before the date slips.
+find_due_soon() {
+  local days="${1:-$DRIFT_DUE_SOON_DAYS}" today_n horizon horizon_n id due st d
+  today_n=$(iso_today); today_n=${today_n//-/}
+  horizon=$(date -v+"${days}"d +%Y-%m-%d 2>/dev/null || date -d "today +${days} days" +%Y-%m-%d)
+  horizon_n=${horizon//-/}
+  board_rows | awk -F'\t' '$2!="done"{print $1}' \
+  | while read -r id; do
+      [ -z "$id" ] && continue
+      due=$(story_deadline "$id"); [ -z "$due" ] && continue
+      d=${due//-/}
+      [ "$d" -ge "$today_n" ] && [ "$d" -le "$horizon_n" ] && printf '%s %s\n' "$id" "$due"
+    done
+}
+
 # Compact one-line drift summary for the sentinel dashboard (or empty).
 render_drift() {
-  local caps stale ab n out=""
+  local caps stale ab over soon n out=""
   caps=$(check_caps)
+  over=$(find_overdue)
+  soon=$(find_due_soon)
   stale=$(find_stale)
   ab=$(find_abandoned)
+  [ -n "$over" ]  && out="${out}overdue[$(printf '%s' "$over" | paste -sd ', ' -)]; "
+  [ -n "$soon" ]  && out="${out}due-soon[$(printf '%s' "$soon" | paste -sd ', ' -)]; "
   [ -n "$caps" ]  && out="${out}cap[$(printf '%s' "$caps" | paste -sd ', ' -)]; "
   [ -n "$stale" ] && out="${out}stale[$(printf '%s' "$stale" | paste -sd ', ' -)]; "
   if [ -n "$ab" ]; then n=$(printf '%s\n' "$ab" | grep -c .); out="${out}${n} abandoned candidate(s); "; fi
@@ -109,6 +144,16 @@ drift_report() {
   local any=0 line id age t
   echo "Drift report ($(iso_today)) — surface-only, resolve during /4loops:today · /4loops:week:"
   while IFS= read -r line; do [ -z "$line" ] && continue; any=1; echo "  cap:    $line"; done < <(check_caps)
+  while IFS= read -r line; do
+    [ -z "$line" ] && continue; any=1
+    id=${line%% *}; t=$(story_title "$id")
+    echo "  overdue:  $line${t:+  — $t}"
+  done < <(find_overdue)
+  while IFS= read -r line; do
+    [ -z "$line" ] && continue; any=1
+    id=${line%% *}; t=$(story_title "$id")
+    echo "  due-soon: $line${t:+  — $t}"
+  done < <(find_due_soon)
   while IFS= read -r line; do
     [ -z "$line" ] && continue; any=1
     id=${line%% *}; t=$(story_title "$id")
