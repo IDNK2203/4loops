@@ -22,7 +22,7 @@ Three reconcilers + one capture are the only things that move the board; it neve
 | `/4loops:arrange <blurb>` | **Capture** — brain-dump work in one go; it drafts the stories (type + deadline) onto the board. User-invoked only; never sets priority. |
 | `/4loops:board` | Render the kanban (keep it pinned — see below). |
 
-Capture carries **type** (`dev` / `modeling`) and an optional **deadline** (`--deadline YYYY-MM-DD`) — the deadline powers prioritization + drift. Under the hood, draft/transition/archive scripts are the rails the reconcilers call; you can invoke them directly (`/4loops:draft`, `:start`, `:done`, `:archive`, `:close --weekly`) but rarely need to.
+Capture carries **type** (`dev` / `modeling`) and an optional **deadline** (`--deadline YYYY-MM-DD`) — the deadline powers prioritization + drift. Under the hood, draft / transition / archive / close scripts are the rails the reconcilers call — there are no per-state slash commands to memorize; the six above are the whole surface. (Power users can still shell the rail scripts directly, e.g. `vt-transition.sh <id> done`, but you never need to.)
 
 > **Pin your board.** The print-once model assumes the board is glanceable. Open `.4loops/board.md`, pin the tab, and toggle Markdown preview (VS Code: right-click tab → Pin · ⌘K V). `/4loops:configure` reminds you on first run.
 
@@ -60,7 +60,7 @@ The spine, hardened for daily driving:
 - **Story types** — `dev` (fixed objective, DONE = shipped) vs `modeling` (fluid objective, DONE = a coherent, traceable decision log). Modeling stories are marked ◆ on the board and reminded at DONE.
 - **Deadlines** — capture a `--deadline`; overdue and due-soon stories surface in drift and lead your daily/weekly prioritization (it's how you see you're going off-plan).
 - **Cleaner capture** — a story's context renders as a markdown link, not a bare file path (nicer board, better image exports).
-- **Honest endings** — retire work off the board with `/4loops:archive`: `abandoned` or `superseded --by <id>`, recorded in the month's archive. `--backdate YYYY-MM-DD` records retroactive work on its real date.
+- **Honest endings** — the weekly `/4loops:week` prune retires dead work off the board: `abandoned` (dropped) or `superseded` (replaced by another story), recorded in the month's archive; `/4loops:priority` can retire one mid-week. `--backdate YYYY-MM-DD` records retroactive work on its real date.
 - **Midweek re-point** — `/4loops:priority` adjusts today's focus between rituals; `priority since` surfaces what's landed since you last set focus, so new work doesn't silently outrun your priorities.
 - **`/4loops:arrange`** — brain-dump a batch of work in plain language; it proposes stories and drafts them onto the board on your confirm. User-invoked only — it never fires on its own and never sets your priority.
 - **The board can't be hand-edited out of band** — `board.md` and `current-priorities.md` are rail-owned; direct edits are blocked (they'd desync counts + the log). Everything rides the rails. Override with `VT_ALLOW_RECORD_WRITE=1`.

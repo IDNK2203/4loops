@@ -6,7 +6,7 @@
 # Per BRIEF §7: drift NEVER blocks. The sentinel RENDERS these signals; the
 # daily/weekly reconciliation ritual RESOLVES them. The only state mutation here
 # is the weekly rollover (Done → closed, abandoned → abandoned), which auto-fires
-# once per ISO week (idempotent marker) and is also reachable via /4loops:close --weekly.
+# once per ISO week (idempotent marker) and is also reachable via vt-close.sh --weekly.
 
 DRIFT_CAP="${VT_DRIFT_CAP:-25}"
 DRIFT_STALE_DAYS="${VT_DRIFT_STALE_DAYS:-14}"
@@ -139,7 +139,7 @@ render_drift() {
   [ -n "$out" ] && printf '[DRIFT] %s' "${out%; }"
 }
 
-# Verbose drift report with titles (for /4loops:close + the reconciliation ritual).
+# Verbose drift report with titles (for the weekly rollover + the reconciliation ritual).
 drift_report() {
   local any=0 line id age t
   echo "Drift report ($(iso_today)) — surface-only, resolve during /4loops:today · /4loops:week:"

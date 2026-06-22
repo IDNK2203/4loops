@@ -53,7 +53,7 @@ INSTALL (isolated only)
 
 SEED
   --seeded     (default) stories across states + pre-armed rail + stale focus (B1 demoable now)
-  --empty      virgin workspace (no board) — walk /4loops:draft → /4loops:today from scratch
+  --empty      virgin workspace (no board) — walk /4loops:arrange → /4loops:today from scratch
 EOF
 }
 

@@ -43,7 +43,7 @@ printf '%s\t%s\t%s\t%s\t%s\n' ... | "${CLAUDE_PLUGIN_ROOT}/scripts/vt-arrange.sh
 "${CLAUDE_PLUGIN_ROOT}/scripts/vt-render.sh"
 ```
 
-Show the preview to the user as you create — if they immediately object, you've only drafted to Backlog (reversible via `/4loops:archive`). If a field was genuinely ambiguous (which project? a date you couldn't infer?), ask ONE tight question before creating.
+Show the preview to the user as you create — if they immediately object, you've only drafted to Backlog (reversible: `vt-transition.sh <id> abandoned`, or retire it in the next `/4loops:week` prune). If a field was genuinely ambiguous (which project? a date you couldn't infer?), ask ONE tight question before creating.
 
 ### 4. Hand priority back
 

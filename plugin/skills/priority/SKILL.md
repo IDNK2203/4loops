@@ -37,7 +37,7 @@ If the user named IDs, apply directly. Otherwise ONE `AskUserQuestion`:
 cat .4loops/current-priorities.md
 ```
 
-Urgent NEW work → capture it first with `/4loops:arrange` or `vt-draft.sh … --type … --deadline …`, then add it. A state nudge → `vt-transition.sh <id> <state>`. Keep it quick — this is the in-between, not the full walk.
+Urgent NEW work → capture it first with `/4loops:arrange` or `vt-draft.sh … --type … --deadline …`, then add it. A state nudge → `vt-transition.sh <id> <state>`. Need to kill a story now (don't wait for the weekly prune)? Retire it: `vt-transition.sh <id> abandoned` or `… superseded --by <ID2>` — it leaves the grid into `archive/<month>/abandoned.md`. Keep it quick — this is the in-between, not the full walk.
 
 `add`/`set` freshen the Today stamp (gate stays lifted) and re-arm/clear like `/today`.
 

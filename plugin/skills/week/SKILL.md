@@ -33,9 +33,12 @@ ONE `AskUserQuestion`, up to three `multiSelect: true` groups (label `ID — tit
 
 - **"Now done?"** — **Testing + In Progress** → `vt-transition.sh <id> done`
 - **"Commit this week (from Backlog)?"** — **Backlog** → `vt-transition.sh <id> planning` (`/today` starts the day's subset)
-- **"Drop / park (stale · overdue)?"** — stale + overdue → `vt-transition.sh <id> backlog` (or `abandoned`)
+- **"Retire — park / abandon / superseded?"** — stale + overdue + abandon-candidates. The weekly prune is where dead work gets an **honest ending**:
+  - park (re-evaluate later) → `vt-transition.sh <id> backlog`
+  - abandon (dropped) → `vt-transition.sh <id> abandoned`
+  - replaced by another story → `vt-transition.sh <id> superseded --by <ID2>` (one follow-up `AskUserQuestion` for which story replaces it)
 
-(Prefix `"${CLAUDE_PLUGIN_ROOT}/scripts/`.) Loop over selected IDs, then **re-render once**. New work → `/4loops:arrange` or `vt-draft.sh … --type … --deadline …`, not the multi-select.
+(Prefix `"${CLAUDE_PLUGIN_ROOT}/scripts/`.) Loop over selected IDs, then **re-render once**. Abandoned / superseded leave the grid into `archive/<month>/abandoned.md` (append-only, reversible); never retire a story in the current focus without explicit confirmation. New work → `/4loops:arrange` or `vt-draft.sh … --type … --deadline …`, not the multi-select.
 
 ### 3. Set the week's anchors (3–5)
 
