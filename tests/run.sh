@@ -48,7 +48,7 @@ isdeny(){ printf '%s' "$1" | grep -q '"permissionDecision"[[:space:]]*:[[:space:
 ck "block: stale + gated"        'O=$(gate "$(pj S1 "$W/projects/p0/content/a.md")"); isdeny "$O"'
 ck "allow: exempt study/"        'O=$(gate "$(pj S1 "$W/projects/p0/study/n.md")"); ! isdeny "$O"'
 ck "allow: exempt root *.md"     'O=$(gate "$(pj S1 "$W/README.md")"); ! isdeny "$O"'
-ck "allow: exempt .4loops/"  'O=$(gate "$(pj S1 "$W/.4loops/board.md")"); ! isdeny "$O"'
+ck "allow: exempt .4loops/"  'O=$(gate "$(pj S1 "$W/.4loops/transitions.log")"); ! isdeny "$O"'
 ck "allow: non-gated src/"       'O=$(gate "$(pj S1 "$W/src/x.js")"); ! isdeny "$O"'
 : > "$VT/.cleared/S2"
 ck "allow: cleared session"      'O=$(gate "$(pj S2 "$W/projects/p0/content/a.md")"); ! isdeny "$O"'
@@ -334,6 +334,23 @@ bash "$S/vt-priority.sh" set "$P3" >/dev/null
 ck "priority set: replaces focus with P3 only"    '[ "$(read_focus today)" = "'"$P3"'" ]'
 ck "priority: bad subcommand errors"              '! bash "$S/vt-priority.sh" bogus 2>/dev/null'
 unset VT_DIR
+
+echo
+echo "════ 12. User-only overwrite — rail-owned records (W4, v2) ════"
+W12=$(mktemp -d); VT="$W12/.4loops"; mkboard "$VT"; : > "$VT/.armed"; : > "$VT/transitions.log"
+pj12(){ printf '{"session_id":"%s","cwd":"%s","tool_input":{"file_path":"%s"}}' "$1" "$W12" "$2"; }
+g12(){ printf '%s' "$1" | bash "$H/vt-gate.sh" 2>&1; }
+ck "record: Edit board.md blocked"             'O=$(g12 "$(pj12 RZ "$W12/.4loops/board.md")"); isdeny "$O"'
+ck "record: Edit current-priorities blocked"   'O=$(g12 "$(pj12 RZ "$W12/.4loops/current-priorities.md")"); isdeny "$O"'
+ck "record: other .4loops file allowed"        'O=$(g12 "$(pj12 RZ "$W12/.4loops/config")"); ! isdeny "$O"'
+ck "record: override allows + logs"            'O=$(VT_ALLOW_RECORD_WRITE=1 g12 "$(pj12 RZ "$W12/.4loops/board.md")"); ! isdeny "$O" && grep -q VT_ALLOW_RECORD_WRITE "$VT/override.log"'
+bj12(){ printf '{"session_id":"%s","cwd":"%s","tool_input":{"command":"%s"}}' "$1" "$W12" "$2"; }
+bg12(){ local o r; o=$(printf '%s' "$1" | bash "$H/vt-bash-gate.sh" 2>&1); r=$?; printf '%s' "$o" | grep -q '"deny"' || [ "$r" = 2 ]; }
+ck "record: sed -i board.md blocked (bash)"    'bg12 "$(bj12 RZ "sed -i s/x/y/ .4loops/board.md")"'
+ck "record: echo >> board.md blocked (bash)"   'bg12 "$(bj12 RZ "echo x >> .4loops/board.md")"'
+ck "record: cat board.md (read) allowed"       '! bg12 "$(bj12 RZ "cat .4loops/board.md")"'
+ck "record: bash override allows board write"  '! bg12 "$(bj12 RZ "VT_ALLOW_RECORD_WRITE=1 echo x >> .4loops/board.md")"'
+unset VT_DIR 2>/dev/null || true
 
 echo "════ RESULT: $P passed, $F failed ════"
 [ "$F" -eq 0 ]

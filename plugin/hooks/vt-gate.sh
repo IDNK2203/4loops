@@ -29,6 +29,14 @@ export VT_DIR="$root/.4loops"
 # shellcheck source=../scripts/vt-priorities-lib.sh
 source "$SCRIPTS_DIR/vt-priorities-lib.sh" 2>/dev/null || exit 0
 
+# W4: rail-owned records are user-only. Block direct hand-edits regardless of
+# gate/armed state (the rails write them via their own scripts, never as a tool
+# write-target). Override (logged): VT_ALLOW_RECORD_WRITE=1.
+if vt_is_rail_record "$abs"; then
+  if [ "${VT_ALLOW_RECORD_WRITE:-}" = "1" ]; then vt_log_record_override "$abs" "$sid"; exit 0; fi
+  vt_emit_deny "$(vt_record_deny_reason)"
+fi
+
 vt_rail_armed || exit 0             # first-run on-ramp: not armed → allow
 vt_is_exempt "$abs" "$root" && exit 0
 vt_is_gated  "$abs" "$root" || exit 0   # narrow-default: only the product surface

@@ -148,6 +148,33 @@ vt_is_gated() {
   return 1
 }
 
+# ── Rail-owned records (W4: user-only overwrite) ─────────────────────────────
+# board.md + current-priorities.md are written ONLY through the rail scripts,
+# which keep counts, the dense grid, and transitions.log in sync. A direct
+# hand-edit by the agent desyncs them — so direct Edit/Write/Bash writes to these
+# two files are blocked (the user overrides with VT_ALLOW_RECORD_WRITE=1). The
+# rest of .4loops/ stays freely writable / exempt. NOTE: the rails write these
+# files inside their own subprocesses, which never surface as a tool write-target,
+# so the rails are never caught by this check — only out-of-band hand-edits are.
+vt_is_rail_record() {
+  case "$1" in
+    */.4loops/board.md|*/.4loops/current-priorities.md) return 0 ;;
+    .4loops/board.md|.4loops/current-priorities.md)      return 0 ;;
+  esac
+  return 1
+}
+
+vt_log_record_override() {
+  local abs="$1" sid="${2:-<no-sid>}" ts
+  ts=$(date "+%Y-%m-%d %H:%M")
+  printf '%s | VT_ALLOW_RECORD_WRITE | record | %s | %s\n' \
+    "$ts" "$sid" "$abs" >> "$VT_DIR/override.log" 2>/dev/null || true
+}
+
+vt_record_deny_reason() {
+  printf '%s' "4loops: the board records (board.md / current-priorities.md) are rail-owned — hand-editing desyncs counts + transitions.log. Use the rails: /4loops:draft, /4loops:today, /4loops:priority, or a transition (/4loops:start · :done · :archive). To hand-edit anyway (logged), re-run prefixed with VT_ALLOW_RECORD_WRITE=1."
+}
+
 # ── Override logging (the only escape — per-action, re-arms next call) ────────
 vt_log_override() {
   local abs="$1" sid="${2:-<no-sid>}" gate_state="${3:-focus-stale}" ts

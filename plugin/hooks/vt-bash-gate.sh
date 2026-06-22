@@ -27,6 +27,11 @@ override=0
 [ "${VT_ALLOW_STALE_GATE:-}" = "1" ] && override=1
 case "$cmd" in *VT_ALLOW_STALE_GATE=1*) override=1 ;; esac
 
+# W4 record-write override (distinct from the staleness override).
+rec_override=0
+[ "${VT_ALLOW_RECORD_WRITE:-}" = "1" ] && rec_override=1
+case "$cmd" in *VT_ALLOW_RECORD_WRITE=1*) rec_override=1 ;; esac
+
 # Extract candidate write targets: > / >> redirects, tee [-a] files, sed -i.
 extract_targets() {
   # redirects ( > file , >> file ) — exclude >& and >(...) process subs
@@ -76,6 +81,11 @@ while IFS= read -r t; do
   export VT_DIR="$root/.4loops"
   # shellcheck source=../scripts/vt-priorities-lib.sh
   source "$SCRIPTS_DIR/vt-priorities-lib.sh" 2>/dev/null || continue
+  # W4: rail-owned records are user-only — block direct hand-edits (any state).
+  if vt_is_rail_record "$abs"; then
+    if [ "$rec_override" = "1" ]; then vt_log_record_override "$abs" "$sid"; continue; fi
+    vt_emit_deny "$(vt_record_deny_reason)"
+  fi
   vt_rail_armed || continue
   vt_is_exempt "$abs" "$root" && continue
   vt_is_gated  "$abs" "$root" || continue
