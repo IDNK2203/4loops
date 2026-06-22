@@ -75,6 +75,66 @@ Walk it:
 
 ---
 
+## How state actually moves (read this once)
+
+There is **no `/transition` or `/done` command** — and that's the design, not a gap. Only four
+commands touch the board, and each has one job:
+
+- **`/4loops:arrange`** — *capture only.* Adds NEW stories to Backlog. Never moves state, never
+  sets priority. (So a brain-dump can't quietly reshuffle your board.)
+- **`/4loops:today` / `/4loops:week`** — *move state.* You see the board, then **pick** what
+  started / finished / parks in a structured menu. This is where stories change columns.
+- **`/4loops:priority`** — *quick in-between.* Bump today's focus or nudge a single story when
+  something lands between rituals.
+
+If you tell Claude "I finished the endpoint" in plain chat, it **won't** silently move it — the
+board only moves when you run one of these. The command is your consent.
+
+## Sample inputs (copy-paste, then improvise)
+
+**Capture a brain-dump** — `/4loops:arrange` takes plain language; it infers project, type, and deadline:
+```
+/4loops:arrange the metrics endpoint 500s on empty ranges — fix before the dashboard demo tomorrow.
+    also need to rewrite the pricing copy, and start sketching the demo video.
+/4loops:arrange spike: should metrics be realtime or 1-min polled? decide before we build the endpoint
+/4loops:arrange flaky CI run keeps failing on the e2e step, and add request logging to the api
+```
+→ It proposes ~3 stories with type (`dev`/`modeling`) + a deadline where you implied one, and drafts
+them on your confirm. It does **not** set what you work on next.
+
+**Daily reconcile** — `/4loops:today`. The board prints once, then you answer structured picks. Your
+free-text moments are only the focus answer, e.g.:
+```
+/4loops:today
+   → (tick) Started: WEB-002 pricing copy
+   → (tick) Now done: API-001 metrics endpoint
+   → focus today: WEB-001, API-002
+```
+
+**Quick mid-day nudge** — `/4loops:priority` (lighter than the full walk):
+```
+/4loops:priority                 # show what's shifted since you set focus, then pick
+/4loops:priority add API-004     # add a story to today's focus, no menu
+/4loops:priority set WEB-001 API-001   # replace today's focus wholesale
+/4loops:priority since           # just list what's landed since your last focus
+```
+
+**Weekly reconcile** — `/4loops:week` (run first on a new week). Structured picks again:
+```
+/4loops:week
+   → (tick) Now done: API-003 CI
+   → (tick) Commit this week: WEB-002, API-002
+   → (tick) Retire → superseded: WEB-005 (replaced by WEB-002)
+   → anchors this week: WEB-001, API-001, API-002
+```
+
+**Retire dead work** — there's no `/archive`; it lives in the `/week` "Retire" group (or quick via
+`/priority`). Pick `abandon` (dropped) or `superseded` (name the story that replaced it) → it leaves
+the grid into `archive/<month>/abandoned.md`.
+
+> The pattern to internalize: **`/arrange` to get work IN, the reconcilers to move it ALONG.** You
+> never type a per-story state command — you see the board and pick.
+
 ## Reset / teardown
 
 ```bash
