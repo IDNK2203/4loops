@@ -14,8 +14,11 @@ It operates on whatever workspace it is enabled in. All state is plain files und
 | `/4loops:today` | Daily board reconciliation; sets 1–3 focus stories and lifts the day's gate. |
 | `/4loops:week` | Weekly reconciliation; sets 3–5 anchors. Run first on a new ISO week. |
 | `/4loops:board` | Render the kanban. |
-| `/4loops:draft <title>` | Capture a new story-draft into Backlog. |
+| `/4loops:draft <title>` | Capture a new story-draft into Backlog. Add `--type modeling` for fluid-objective work, `--backdate YYYY-MM-DD` to record past work. |
+| `/4loops:arrange <blurb>` | **Describe a batch of work in plain language** — it proposes the stories, then drafts them onto the board on your confirm. User-invoked only; never sets priority. |
+| `/4loops:priority add\|set <id…>` | Re-point today's focus mid-week without the full ritual; `since` shows what's landed since you last set focus. |
 | `/4loops:plan` · `/4loops:start` · `/4loops:test` · `/4loops:done` | Move a story across states. |
+| `/4loops:archive <id>` | Retire a story off the board: `abandoned` (dropped) or `superseded --by <id>` (replaced) → `archive/<month>/`. |
 | `/4loops:close [--weekly]` | End-of-day drift retro; `--weekly` archives Done → `archive/`. |
 
 ## How it enforces
@@ -43,6 +46,19 @@ gated: apps/notes-cli/*
 ```
 
 The **hard-exempt** surfaces are always writable regardless of config — `.4loops/`, `.claude/`, `study/`, `learnings/`, `inbox/`, `reviews/`, root `*.md`, `ARTIFACTS.md`, `.env*`, `.gitignore` — so the gate can never block its own reconciliation, your research, or your notes.
+
+## What's new in v2.1
+
+The spine, hardened for daily driving:
+
+- **Story types** — `dev` (fixed objective, DONE = shipped) vs `modeling` (fluid objective, DONE = a coherent, traceable decision log). Modeling stories are marked ◆ on the board and reminded at DONE.
+- **Honest endings** — retire work off the board with `/4loops:archive`: `abandoned` or `superseded --by <id>`, recorded in the month's archive. `--backdate YYYY-MM-DD` records retroactive work on its real date.
+- **Midweek re-point** — `/4loops:priority` adjusts today's focus between rituals; `priority since` surfaces what's landed since you last set focus, so new work doesn't silently outrun your priorities.
+- **`/4loops:arrange`** — brain-dump a batch of work in plain language; it proposes stories and drafts them onto the board on your confirm. User-invoked only — it never fires on its own and never sets your priority.
+- **The board can't be hand-edited out of band** — `board.md` and `current-priorities.md` are rail-owned; direct edits are blocked (they'd desync counts + the log). Everything rides the rails. Override with `VT_ALLOW_RECORD_WRITE=1`.
+- **Self-cleaning state** — replicating idempotency markers are GC'd to latest-only.
+
+All additive — v2.0 boards keep working untouched.
 
 ## Install
 
