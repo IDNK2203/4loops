@@ -1,13 +1,11 @@
 ---
 name: today
-description: Daily board reconciliation — talk through your day in plain language (what you finished, started, dropped, or need to add) and it moves the board, captures new work, and sets today's 1–3 focus. Surfaces overdue / due-soon. Writes the Today stamp, which lifts the focus gate for the day.
+description: Daily board reconciliation — print the board, then pick (structured) what moved: started / testing / done / park. New work and today's 1–3 focus fall out of it. Leads with overdue / due-soon. Writes the Today stamp, which lifts the focus gate for the day.
 allowed-tools: Bash, AskUserQuestion
 user-invocable: true
 ---
 
-`/today` is your **daily board conversation**. You don't type `/start` or `/done` — you just tell me what happened ("shipped the gate fix, started the demo, drop the old idea, and add a new post due Friday") and I reconcile the board for you, then set today's focus.
-
-**Invoking this command is your authorization to drive the rails.** You opened the door, so I apply the moves from what you tell me — I won't ask "are you sure?" on every step. The board can't move on its own; only this conversation (or `/week` · `/priority` · `/arrange`) moves it.
+`/today` is the daily **board reconciliation**. You **see the board, then pick what changed** — you don't hand-type `/start`/`/done` per story, and you don't narrate it in prose. The board print is the context; structured selection is how you move things; today's focus falls out. Your selections apply directly (the pick *is* the confirmation). Running it writes today's stamp, which lifts the gate for the day.
 
 ## Steps
 
@@ -19,45 +17,44 @@ user-invocable: true
 
 If `UNCONFIGURED`, stop and say: **"No 4loops board is configured here yet — run `/4loops:configure` first."**
 
-### 1. Orient (board + drift + carry-forward)
+### 1. Orient — print the board ONCE (the context)
 
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/scripts/vt-render.sh"
-"${CLAUDE_PLUGIN_ROOT}/scripts/vt-drift.sh"          # caps · OVERDUE · DUE-SOON · stale · abandon-candidates
-"${CLAUDE_PLUGIN_ROOT}/scripts/vt-today.sh" --default   # carry-forward suggestion
+"${CLAUDE_PLUGIN_ROOT}/scripts/vt-drift.sh"          # OVERDUE · DUE-SOON · caps · stale · abandon-candidates
+"${CLAUDE_PLUGIN_ROOT}/scripts/vt-today.sh" --default   # carry-forward → SUGGESTED_FOCUS
+"${CLAUDE_PLUGIN_ROOT}/scripts/vt-today.sh" --current
 ```
 
-Lead with anything **overdue or due-soon** — those are the off-plan signals that should shape today's focus.
+Print this once — it's the whole picture you reconcile against (if the user keeps `board.md` pinned, treat it as a refresh, don't re-dump). **Lead with anything overdue / due-soon** — those are the off-plan signals that should shape today.
 
-### 2. Listen, then reconcile (this is where the board moves)
+### 2. Reconcile — structured multi-select (state moves HERE)
 
-Take the user's plain-language account of their day. Map it to rail calls and **run them** — loop the scripts over each item, in flow order:
+Build ONE `AskUserQuestion` with up to **four** `multiSelect: true` groups — each a single forward step along `backlog → in-progress → testing → done`, plus a park escape. Omit any group whose source set is empty. Label every option `ID — title` (mark ◆ modeling, and append `· due <date>`/`· OVERDUE` where it applies, so the deadline is visible at the pick):
 
-```bash
-"${CLAUDE_PLUGIN_ROOT}/scripts/vt-transition.sh" <id> in-progress     # "started X"
-"${CLAUDE_PLUGIN_ROOT}/scripts/vt-transition.sh" <id> testing         # "X is in review"
-"${CLAUDE_PLUGIN_ROOT}/scripts/vt-transition.sh" <id> done            # "finished X"
-"${CLAUDE_PLUGIN_ROOT}/scripts/vt-transition.sh" <id> backlog         # "park X"
-"${CLAUDE_PLUGIN_ROOT}/scripts/vt-transition.sh" <id> abandoned       # "drop X" (or: superseded --by <id2>)
-"${CLAUDE_PLUGIN_ROOT}/scripts/vt-draft.sh" <P> "<title>" "<why>" "<doc>" --type <dev|modeling> --deadline <YYYY-MM-DD>   # "add X…"
-```
+1. **"Starting today?"** — **Backlog** → `vt-transition.sh <id> in-progress`
+2. **"Moved to testing?"** — **In Progress** → `vt-transition.sh <id> testing`
+3. **"Now done?"** — **In Progress + Testing** → `vt-transition.sh <id> done`
+4. **"Park / drop (stale · overdue)?"** — stale + overdue candidates → `vt-transition.sh <id> backlog` (or `abandoned` if truly dropped)
 
-When the user names new work, **capture it with its type and (if they gave one) a deadline** — deadlines are what let `/today` flag drift later. If something's ambiguous (which project? a date?), ask one tight question; otherwise just do it. Re-render after applying.
+(Prefix each with `"${CLAUDE_PLUGIN_ROOT}/scripts/`.) Each story in at most one group. Apply selections in flow order, then **re-render once**. Unselected stays put. All sets empty → skip silently, no churn. Four groups is the `AskUserQuestion` max, so reconcile and focus-set stay two calls; a single-story group needs a `None — leave as is` filler option (≥2 required), treated as a no-op.
 
-If the user only wants a recap, just summarize the board + drift and stop — reading never changes anything.
+**New work** isn't a checkbox — capture it with type + deadline via `/4loops:arrange` (a batch) or one `vt-draft.sh <P> "<title>" "<why>" "<doc>" --type <…> --deadline <YYYY-MM-DD>`. Don't force it into the multi-select.
 
 ### 3. Set today's focus (the byproduct)
 
-Propose 1–3 focus stories — carry-forward + anything overdue/due-soon first. Confirm or let the user edit (free-text). Then:
+`AskUserQuestion` (single-select): **Keep `[SUGGESTED_FOCUS]`** / **Edit** (free-text 1–3 via Other) / **Skip**. Bias the suggestion so **overdue / due-soon lead**. Sanity-check IDs against the board.
+
+### 4. Write + show
 
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/scripts/vt-today.sh" <ID1> <ID2> ...
 cat .4loops/current-priorities.md
 ```
 
-This freshens the Today stamp, **arms the rail**, and clears this session's gate when today+week are both fresh. The file IS the message.
+Preserves the Week section, refreshes slices, **arms the rail**, and records this session cleared when today+week are fresh. The file IS the message.
 
 ## Notes
 
-- Priority stays **yours** — I propose focus, you decide. I never reprioritize unprompted.
-- All mutations ride the rails (which keep counts + the log in sync) — I never hand-edit `board.md`.
+- Skip at step 3 → don't write; the gate stays active and re-prompts. Step-2 moves still stand.
+- Priority stays **yours** — propose, you decide. Mutations ride the rails; never hand-edit `board.md`.

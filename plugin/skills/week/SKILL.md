@@ -1,13 +1,11 @@
 ---
 name: week
-description: Weekly board reconciliation — talk through the week in plain language (what shipped, what carries over, what to drop or add) and it reconciles the board, captures new work, and sets this week's 3–5 anchors. Surfaces overdue / due-soon. Run first on a new ISO week, before /today.
+description: Weekly board reconciliation — print the board, then pick (structured) what's done, what to commit this week, what to drop; set 3–5 anchors. Leads with overdue / due-soon. Run FIRST on a new ISO week, before /today, so the week's context flows down to the day.
 allowed-tools: Bash, AskUserQuestion
 user-invocable: true
 ---
 
-`/week` is your **weekly board conversation** — the wider lens, run first on a new ISO week before `/today`. Same idea as `/today`: you describe the week in plain language and I reconcile the board and set the week's anchors. The sentinel has already auto-archived last week's Done + abandoned (rollover); you reconcile what remains.
-
-**Invoking this command authorizes me to drive the rails** — I apply your reconciliation from the conversation, no per-step confirmation. Only this (or `/today` · `/priority` · `/arrange`) moves the board.
+`/week` is the weekly **board reconciliation** — the wider lens. Same shape as `/today`: **see the board, pick what changed**, no prose narration. Run it **first on a new ISO week, before `/today`** (run it once, at week start) — the sentinel has already auto-archived last week's Done + abandoned (rollover); you reconcile what remains and set the week's anchors, and that context flows down into `/today`.
 
 ## Steps
 
@@ -19,30 +17,29 @@ user-invocable: true
 
 If `UNCONFIGURED`, stop: **"No 4loops board is configured here yet — run `/4loops:configure` first."**
 
-### 1. Orient
+### 1. Orient — print the board ONCE
 
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/scripts/vt-render.sh"
-"${CLAUDE_PLUGIN_ROOT}/scripts/vt-drift.sh"           # caps · OVERDUE · DUE-SOON · stale · abandon
-"${CLAUDE_PLUGIN_ROOT}/scripts/vt-week.sh" --default  # carry-forward (last week's still-alive focus)
+"${CLAUDE_PLUGIN_ROOT}/scripts/vt-drift.sh"           # OVERDUE · DUE-SOON · caps · stale · abandon
+"${CLAUDE_PLUGIN_ROOT}/scripts/vt-week.sh" --default  # last week's still-alive focus → SUGGESTED_FOCUS
 ```
 
-Confirm the rollover didn't sweep anything important (archive is append-only under `.4loops/archive/`, reversible). Lead with overdue / due-soon.
+Print once. Lead with overdue / due-soon. Confirm the rollover didn't sweep anything important (archive is append-only under `.4loops/archive/`, reversible). Because `/week` runs before `/today`, this is the one board print at week start — don't re-dump it in `/today` right after.
 
-### 2. Listen, then reconcile (the board moves here)
+### 2. Reconcile — structured multi-select (week lens)
 
-Map the user's plain-language account of the week to rail calls and run them — finish, carry over, park, drop, or capture new work (with `--type` and `--deadline`):
+ONE `AskUserQuestion`, up to three `multiSelect: true` groups (label `ID — title`, mark ◆ / `· due <date>` / `· OVERDUE`); omit empty ones:
 
-```bash
-"${CLAUDE_PLUGIN_ROOT}/scripts/vt-transition.sh" <id> done|backlog|abandoned|...
-"${CLAUDE_PLUGIN_ROOT}/scripts/vt-draft.sh" <P> "<title>" "<why>" "<doc>" --type <…> --deadline <YYYY-MM-DD>
-```
+- **"Now done?"** — **Testing + In Progress** → `vt-transition.sh <id> done`
+- **"Commit this week (from Backlog)?"** — **Backlog** → `vt-transition.sh <id> planning` (`/today` starts the day's subset)
+- **"Drop / park (stale · overdue)?"** — stale + overdue → `vt-transition.sh <id> backlog` (or `abandoned`)
 
-Capturing the *week's* new work with deadlines is what makes drift meaningful across the week. Re-render after. Recap-only request → just summarize and stop.
+(Prefix `"${CLAUDE_PLUGIN_ROOT}/scripts/`.) Loop over selected IDs, then **re-render once**. New work → `/4loops:arrange` or `vt-draft.sh … --type … --deadline …`, not the multi-select.
 
 ### 3. Set the week's anchors (3–5)
 
-Propose anchors — carry-forward + anything overdue/due-soon first. Confirm or edit, then:
+`AskUserQuestion` (single-select): **Keep `[SUGGESTED_FOCUS]`** / **Edit** / **Skip**. Cap 3–5; bias overdue/due-soon to the front. Then:
 
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/scripts/vt-week.sh" <ID1> ... <IDn>
@@ -53,5 +50,5 @@ Preserves the Today section, refreshes slices, arms the rail. Then run `/today` 
 
 ## Notes
 
-- `/week` sets the week's 3–5 anchors; `/today` selects the day's subset. Set week first, refine daily.
-- Priority stays **yours** — I propose, you decide. Mutations ride the rails; I never hand-edit `board.md`.
+- `/week` sets the week's 3–5 anchors; `/today` selects the day's subset. Week first, refine daily.
+- Skip at step 3 → don't write; the week gate stays active. Priority is yours; mutations ride the rails.

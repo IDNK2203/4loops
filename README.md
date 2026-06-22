@@ -8,20 +8,23 @@ It operates on whatever workspace it is enabled in. All state is plain files und
 
 ## The loop
 
-**You drive 4loops by *talking to it*, not by typing state commands.** Four conversational
-commands move the board — you describe what happened in plain language and the agent reconciles it
-through the rails. Invoking one of these *is* your authorization; the board never moves on its own.
+**You drive 4loops by *seeing the board and picking what moved*** — not by typing a state command per
+story, and not by narrating it in prose. A reconciliation command **prints the board, then offers
+structured options** (started / testing / done / park); you tick what changed and it runs the rails.
+Three reconcilers + one capture are the only things that move the board; it never moves on its own.
 
 | Command | What it does |
 | --- | --- |
-| `/4loops:configure` | **First-run setup** (run once): detect your projects, pick a week-start, confirm which surfaces the gate guards, then spawn this week's focus. |
-| `/4loops:today` | **Daily conversation** — "shipped X, started Y, drop Z, add a post due Friday" → it moves states, captures new work, sets 1–3 focus, lifts the day's gate. Leads with overdue / due-soon. |
-| `/4loops:week` | **Weekly conversation** — wider lens; reconcile the week, set 3–5 anchors. Run first on a new ISO week. |
-| `/4loops:priority` | **In-between conversation** — when something lands between rituals: re-point focus, move a state, add urgent work. `add`/`set <id…>` for a direct nudge; `since` shows what's changed. |
-| `/4loops:arrange <blurb>` | **Capture** — brain-dump work in plain language; it drafts the stories (type + deadline) onto the board. User-invoked only; never sets priority. |
-| `/4loops:board` | Render the kanban. |
+| `/4loops:configure` | **First-run setup** (run once): detect your projects, pick a week-start, confirm gated surfaces, spawn this week's focus — and pin your board. |
+| `/4loops:today` | **Daily reconcile** — prints the board, then you pick what started / moved / finished / parks; sets 1–3 focus, lifts the day's gate. Leads with overdue / due-soon. |
+| `/4loops:week` | **Weekly reconcile** — wider lens; pick done / commit-this-week / drop, set 3–5 anchors. Run first on a new ISO week (its context flows into `/today`). |
+| `/4loops:priority` | **In-between** — when work lands between rituals: prints what's changed, you bump focus / nudge a state / capture urgent work. Lighter than the full walk. |
+| `/4loops:arrange <blurb>` | **Capture** — brain-dump work in one go; it drafts the stories (type + deadline) onto the board. User-invoked only; never sets priority. |
+| `/4loops:board` | Render the kanban (keep it pinned — see below). |
 
-Capture carries **type** (`dev` / `modeling`) and an optional **deadline** (`--deadline YYYY-MM-DD`) — the deadline is what powers prioritization and drift. Under the hood, draft/transition/archive scripts are the rails the conversations call; you can invoke them directly (`/4loops:draft`, `:start`, `:done`, `:archive`, `:close --weekly`) but you rarely need to.
+Capture carries **type** (`dev` / `modeling`) and an optional **deadline** (`--deadline YYYY-MM-DD`) — the deadline powers prioritization + drift. Under the hood, draft/transition/archive scripts are the rails the reconcilers call; you can invoke them directly (`/4loops:draft`, `:start`, `:done`, `:archive`, `:close --weekly`) but rarely need to.
+
+> **Pin your board.** The print-once model assumes the board is glanceable. Open `.4loops/board.md`, pin the tab, and toggle Markdown preview (VS Code: right-click tab → Pin · ⌘K V). `/4loops:configure` reminds you on first run.
 
 ## How it enforces
 
@@ -53,7 +56,7 @@ The **hard-exempt** surfaces are always writable regardless of config — `.4loo
 
 The spine, hardened for daily driving:
 
-- **Talk to it, don't type at it** — `/today`, `/week`, `/priority`, and `/arrange` are natural-language conversations. You describe what happened; the agent reconciles the board through the rails. No more `/start`/`/done` typing — those are internal now.
+- **See-then-pick reconciliation** — `/today`, `/week`, and `/priority` print the board, then offer structured options (started / done / park…); you tick what moved and it runs the rails. No `/start`/`/done` typing per story, no prose narration. `/arrange` captures a brain-dump in one go.
 - **Story types** — `dev` (fixed objective, DONE = shipped) vs `modeling` (fluid objective, DONE = a coherent, traceable decision log). Modeling stories are marked ◆ on the board and reminded at DONE.
 - **Deadlines** — capture a `--deadline`; overdue and due-soon stories surface in drift and lead your daily/weekly prioritization (it's how you see you're going off-plan).
 - **Cleaner capture** — a story's context renders as a markdown link, not a bare file path (nicer board, better image exports).

@@ -431,13 +431,16 @@ ck "drift line: surfaces due-soon"         'printf "%s" "$DR" | grep -q "due-soo
 unset VT_DIR
 
 echo
-echo "════ 17. Conversational reconciliation contract (W9, v2) ════"
-ck "today: natural-language conversation framing"  'grep -qi "daily board conversation" "$PLUGIN/skills/today/SKILL.md"'
-ck "today: command = rail authorization"           'grep -qi "authorization to drive the rails" "$PLUGIN/skills/today/SKILL.md"'
-ck "today: surfaces overdue / due-soon"            'grep -qi "overdue" "$PLUGIN/skills/today/SKILL.md"'
-ck "week: weekly conversation framing"             'grep -qi "weekly board conversation" "$PLUGIN/skills/week/SKILL.md"'
-ck "priority: in-between cadence framing"          'grep -qi "in-between" "$PLUGIN/skills/priority/SKILL.md"'
-ck "arrange: confirm-gate dropped (consent)"       'grep -qi "no separate confirm gate" "$PLUGIN/skills/arrange/SKILL.md"'
+echo "════ 17. Reconciliation contract — see-then-pick, structured (W9/W10, v2) ════"
+ck "today: see-the-board-then-pick (not chat)"  'grep -qi "see the board, then pick" "$PLUGIN/skills/today/SKILL.md"'
+ck "today: structured multi-select reconcile"   'grep -qi "structured multi-select" "$PLUGIN/skills/today/SKILL.md"'
+ck "today: prints the board once"               'grep -qi "print the board ONCE" "$PLUGIN/skills/today/SKILL.md"'
+ck "today: surfaces overdue / due-soon"         'grep -qi "overdue" "$PLUGIN/skills/today/SKILL.md"'
+ck "week: wider lens, runs first"               'grep -qi "wider lens" "$PLUGIN/skills/week/SKILL.md"'
+ck "week: structured multi-select reconcile"    'grep -qi "structured multi-select" "$PLUGIN/skills/week/SKILL.md"'
+ck "priority: in-between cadence"               'grep -qi "in-between" "$PLUGIN/skills/priority/SKILL.md"'
+ck "arrange: user-invoked only (capture)"       'grep -q "disable-model-invocation: true" "$PLUGIN/skills/arrange/SKILL.md"'
+ck "configure: pin-the-board onboarding tip"    'grep -qi "pin" "$PLUGIN/skills/configure/SKILL.md"'
 
 echo "════ RESULT: $P passed, $F failed ════"
 [ "$F" -eq 0 ]
