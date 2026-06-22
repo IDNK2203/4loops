@@ -98,8 +98,9 @@ fi
 if [ "$TODAY_STALE" = false ] && [ "$WEEK_STALE" = false ]; then
   vt_mark_session_cleared "$SID"
 fi
-vt_prune_cleared
-find "$VT_DIR" -maxdepth 1 -name '.prompt-nudged-*' ! -name ".prompt-nudged-$(iso_today)" -delete 2>/dev/null || true
+# W5: GC replicating markers to latest-only (.weekly-rolled-*, .prompt-nudged-*,
+# stale .cleared/*) so they don't accumulate unbounded across weeks.
+vt_gc_markers
 
 # --- Emit -----------------------------------------------------------------------
 # systemMessage leads with a newline so the dashboard starts on its own line,

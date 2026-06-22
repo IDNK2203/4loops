@@ -95,6 +95,22 @@ vt_prune_cleared() {
   find "$dir" -type f -mtime +3 -delete 2>/dev/null || true
 }
 
+# ── File-growth GC (W5): replicating markers → "latest only" ─────────────────
+# Idempotency markers replicate one-per-period and never self-clean:
+#   .weekly-rolled-*  → keep only the CURRENT week's (older weeks are dead weight)
+#   .prompt-nudged-*  → keep only today's
+#   .cleared/*        → drop markers older than 3 days (dead sessions)
+# These are pure guards (no history), so pruning is safe. Best-effort + fail-open.
+# Requires week_marker_id + iso_today (vt-priorities-lib.sh) sourced.
+vt_gc_markers() {
+  local cur_week today
+  cur_week=".weekly-rolled-$(week_marker_id 2>/dev/null)"
+  today=".prompt-nudged-$(iso_today 2>/dev/null)"
+  find "$VT_DIR" -maxdepth 1 -name '.weekly-rolled-*' ! -name "$cur_week" -delete 2>/dev/null || true
+  find "$VT_DIR" -maxdepth 1 -name '.prompt-nudged-*' ! -name "$today" -delete 2>/dev/null || true
+  vt_prune_cleared
+}
+
 # ── Gated vs exempt surface (narrow-default) ─────────────────────────────────
 # Only the named product surfaces are gated; everything else is allowed. The
 # exempt list is a HARD always-allow (even if config widens the gated set), so

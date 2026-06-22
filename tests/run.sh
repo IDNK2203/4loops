@@ -352,5 +352,21 @@ ck "record: cat board.md (read) allowed"       '! bg12 "$(bj12 RZ "cat .4loops/b
 ck "record: bash override allows board write"  '! bg12 "$(bj12 RZ "VT_ALLOW_RECORD_WRITE=1 echo x >> .4loops/board.md")"'
 unset VT_DIR 2>/dev/null || true
 
+echo
+echo "════ 13. File-growth GC — latest-only markers (W5, v2) ════"
+W13=$(mktemp -d); export VT_DIR="$W13/.4loops"; mkdir -p "$VT_DIR/.cleared"
+# shellcheck source=/dev/null
+source "$S/vt-priorities-lib.sh"
+CUR=".weekly-rolled-$(week_marker_id)"
+: > "$VT_DIR/$CUR"
+: > "$VT_DIR/.weekly-rolled-2020-W01"; : > "$VT_DIR/.weekly-rolled-2019-W52"
+: > "$VT_DIR/.prompt-nudged-$(iso_today)"; : > "$VT_DIR/.prompt-nudged-2020-01-01"
+bash "$S/vt-gc.sh" >/dev/null
+ck "gc: keeps current weekly-rolled marker"   '[ -f "$VT_DIR/$CUR" ]'
+ck "gc: prunes old weekly-rolled markers"     '[ ! -f "$VT_DIR/.weekly-rolled-2020-W01" ] && [ ! -f "$VT_DIR/.weekly-rolled-2019-W52" ]'
+ck "gc: keeps today prompt-nudged marker"     '[ -f "$VT_DIR/.prompt-nudged-$(iso_today)" ]'
+ck "gc: prunes old prompt-nudged markers"     '[ ! -f "$VT_DIR/.prompt-nudged-2020-01-01" ]'
+unset VT_DIR
+
 echo "════ RESULT: $P passed, $F failed ════"
 [ "$F" -eq 0 ]
