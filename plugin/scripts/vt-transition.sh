@@ -105,4 +105,10 @@ printf "%s\t%s\t%s→%s\n" "$TS" "$ID" "$OLD_STATE" "$NEW_STATE" >> "$VT_DIR/tra
 source "$SCRIPT_DIR/vt-priorities-lib.sh"
 refresh_priorities_activity
 
+# W1 done-rule: a MODELING story's DONE is "model coherent + traceable", witnessed
+# by a decision log — not just "shipped". Surface the reminder (never block: fail-open).
+if [ "$NEW_STATE" = "done" ] && [ "$(story_type "$ID")" = "modeling" ]; then
+  echo "note: ${ID} is a MODELING story — DONE = a coherent + traceable decision log, not just 'shipped'." >&2
+fi
+
 echo "${ID}: ${OLD_STATE} → ${NEW_STATE}"

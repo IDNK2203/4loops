@@ -1,13 +1,30 @@
 #!/usr/bin/env bash
-# vt-draft.sh <project> <title> [why] [context]
+# vt-draft.sh <project> <title> [why] [context] [--type dev|modeling]
 # Creates a new story-draft row in the Backlog column of the kanban table.
 # Auto-registers the project in the Projects table if first time seen.
+#
+# --type sets the story's objective shape (v2 / W1):
+#   dev      — objective fixed + testable; DONE = tests pass / shipped (default).
+#   modeling — objective fluid; DONE = a coherent + traceable decision log.
+# Default `dev` rows are written byte-identical to v1 (no type token) for back-compat.
 set -euo pipefail
 
-PROJECT="${1:?usage: vt-draft <project> <title> [why] [context]}"
-TITLE="${2:?usage: vt-draft <project> <title> [why] [context]}"
+# Pull the --type flag out of anywhere in the arg list; the rest stay positional.
+TYPE="dev"
+ARGS=()
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --type) TYPE="${2:-dev}"; shift 2 ;;
+    *)      ARGS+=("$1"); shift ;;
+  esac
+done
+set -- ${ARGS[@]+"${ARGS[@]}"}
+
+PROJECT="${1:?usage: vt-draft <project> <title> [why] [context] [--type dev|modeling]}"
+TITLE="${2:?usage: vt-draft <project> <title> [why] [context] [--type dev|modeling]}"
 WHY="${3:-}"
 CONTEXT="${4:-}"
+case "$TYPE" in dev|modeling) ;; *) TYPE="dev" ;; esac
 
 # The board is parsed with awk -F'|', so a real '|' in any field — even
 # backslash-escaped — splits the row and truncates the cell (+ its archive
@@ -27,6 +44,7 @@ BOARD="$VT_DIR/board.md"
 ID=$("$SCRIPT_DIR/vt-next-id.sh" "$PROJECT")
 
 CELL="[${PROJECT}] **${ID}** ${TITLE}"
+[ "$TYPE" != "dev" ] && CELL="${CELL} — type: ${TYPE}"
 [ -n "$WHY" ] && CELL="${CELL} — why: ${WHY}"
 [ -n "$CONTEXT" ] && CELL="${CELL} — context: \`${CONTEXT}\`"
 

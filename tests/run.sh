@@ -263,5 +263,26 @@ ck "bash-gate: cd-then-rm gated blocked"      'gate_blocks "cd proj && rm sub/x.
 ck "bash-gate: rm outside any project ok"     '! gate_blocks "rm notes/x.md"'
 unset VT_DIR
 
+echo
+echo "════ 9. Story types — DEV vs MODELING (W1, v2) ════"
+W9=$(mktemp -d); export VT_DIR="$W9/.4loops"
+# shellcheck source=/dev/null
+source "$S/vt-priorities-lib.sh"
+DID=$(bash "$S/vt-draft.sh" T "dev task" | grep -oE 'T-[0-9]+')
+MID=$(bash "$S/vt-draft.sh" T "model task" --type modeling | grep -oE 'T-[0-9]+')
+ck "type: dev row omits type token (back-compat)" '! grep "'"$DID"'" "$VT_DIR/board.md" | grep -q "type:"'
+ck "type: modeling row carries token"             'grep "'"$MID"'" "$VT_DIR/board.md" | grep -q "type: modeling"'
+ck "type: story_type reads dev (default)"         '[ "$(story_type "'"$DID"'")" = "dev" ]'
+ck "type: story_type reads modeling"              '[ "$(story_type "'"$MID"'")" = "modeling" ]'
+ck "type: story_title strips type token"          '[ "$(story_title "'"$MID"'")" = "model task" ]'
+XID=$(bash "$S/vt-draft.sh" T "bogus type" --type nonsense | grep -oE 'T-[0-9]+')
+ck "type: invalid --type falls back to dev"       '[ "$(story_type "'"$XID"'")" = "dev" ]'
+MWARN=$(bash "$S/vt-transition.sh" "$MID" done 2>&1 >/dev/null)
+ck "type: modeling DONE emits decision-log note"  'printf "%s" "$MWARN" | grep -q "MODELING"'
+DWARN=$(bash "$S/vt-transition.sh" "$DID" done 2>&1 >/dev/null)
+ck "type: dev DONE is silent (no note)"           '! printf "%s" "$DWARN" | grep -q "MODELING"'
+ck "type: compact board marks modeling with ◆"    'bash "$S/vt-render.sh" | grep -q "◆"'
+unset VT_DIR
+
 echo "════ RESULT: $P passed, $F failed ════"
 [ "$F" -eq 0 ]

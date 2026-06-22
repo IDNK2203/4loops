@@ -109,13 +109,31 @@ story_title() {
           cell = cells[i]
           # Strip leading " [PROJ] **ID** "
           sub(/^ *\[[^]]*\] \*\*[^*]*\*\* */, "", cell)
-          # Strip trailing " — why: ..." or " — context: ..."
-          sub(/ — (why|context):.*/, "", cell)
+          # Strip trailing metadata: " — why: ..." / " — context: ..." / " — type: ..."
+          sub(/ — (why|context|type):.*/, "", cell)
           gsub(/^ +| +$/, "", cell)
           print cell
           exit
         }
       }
+    }
+  ' "$BOARD"
+}
+
+# Return a story's objective type (dev|modeling). Defaults to "dev" when no type
+# token is present (v1 rows, and v2 dev rows which omit the token). The matched
+# tail is pure ASCII ("type: <word>"), so RSTART/RLENGTH offsets stay byte-safe
+# despite the multibyte em-dash elsewhere in the cell.
+story_type() {
+  local id="$1"
+  [ ! -f "$BOARD" ] && { echo dev; return; }
+  awk -v id="$id" '
+    index($0, "**" id "**") {
+      if (match($0, /type: [a-z]+/)) {
+        t = substr($0, RSTART + 6, RLENGTH - 6)   # "type: " = 6 ASCII bytes
+        if (t == "dev" || t == "modeling") { print t; exit }
+      }
+      print "dev"; exit
     }
   ' "$BOARD"
 }

@@ -66,12 +66,15 @@ awk -F'|' \
   # Compact a board cell to "[PROJ] **ID** Title" with the title truncated,
   # dropping the — why: / — context: tail. Preserves the bold **ID** so the
   # truncation never splits a markdown marker.
-  function compact(c,   p, t) {
-    sub(/ — (why|context):.*/, "", c)
+  function compact(c,   p, t, mark) {
+    # A modeling story gets a ◆ glance-marker so the board reads honestly at a
+    # glance (detected before the metadata tail is stripped).
+    mark = (c ~ /type: modeling/) ? "◆ " : ""
+    sub(/ — (why|context|type):.*/, "", c)
     if (match(c, /^\[[^]]*\] \*\*[^*]*\*\* /)) {
       p = substr(c, 1, RLENGTH); t = substr(c, RLENGTH + 1)
       if (length(t) > MAXTITLE) t = substr(t, 1, MAXTITLE - 1) "…"
-      return p t
+      return p mark t
     }
     return (length(c) > 44) ? substr(c, 1, 43) "…" : c
   }
