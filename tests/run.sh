@@ -371,15 +371,17 @@ unset VT_DIR
 echo
 echo "════ 14. Task-arranger batch helper (W6, v2) ════"
 W14=$(mktemp -d); export VT_DIR="$W14/.4loops"
-TSV=$(printf 'P0\tship the thing\tdev\tbecause\nP0\tmodel the flow\tmodeling\t\n')
+TSV=$(printf 'P0\tship the thing\tdev\tbecause\t2026-07-15\nP0\tmodel the flow\tmodeling\t\t\n')
 DRY=$(printf '%s\n' "$TSV" | bash "$S/vt-arrange.sh" --dry-run)
 ck "arrange dry-run: previews the stories"     'printf "%s" "$DRY" | grep -q "ship the thing"'
 ck "arrange dry-run: shows inferred type"      'printf "%s" "$DRY" | grep -q "type: modeling"'
+ck "arrange dry-run: shows deadline"           'printf "%s" "$DRY" | grep -q "due 2026-07-15"'
 ck "arrange dry-run: creates nothing"          '[ ! -f "$VT_DIR/board.md" ]'
 printf '%s\n' "$TSV" | bash "$S/vt-arrange.sh" >/dev/null
 ck "arrange: drafts the dev story"             'grep -q "ship the thing" "$VT_DIR/board.md"'
 ck "arrange: drafts the modeling story"        'grep -q "model the flow" "$VT_DIR/board.md"'
 ck "arrange: preserves type=modeling"          'grep "model the flow" "$VT_DIR/board.md" | grep -q "type: modeling"'
+ck "arrange: applies deadline from TSV"        'grep "ship the thing" "$VT_DIR/board.md" | grep -q "due: 2026-07-15"'
 ck "arrange: both land in Backlog (2 rows)"    '[ "$(grep -cE "ship the thing|model the flow" "$VT_DIR/board.md")" -ge 2 ]'
 ck "arrange: skill is user-invoked only"       'grep -q "disable-model-invocation: true" "$PLUGIN/skills/arrange/SKILL.md"'
 unset VT_DIR
@@ -427,6 +429,15 @@ DR=$(render_drift)
 ck "drift line: surfaces overdue"          'printf "%s" "$DR" | grep -q "overdue"'
 ck "drift line: surfaces due-soon"         'printf "%s" "$DR" | grep -q "due-soon"'
 unset VT_DIR
+
+echo
+echo "════ 17. Conversational reconciliation contract (W9, v2) ════"
+ck "today: natural-language conversation framing"  'grep -qi "daily board conversation" "$PLUGIN/skills/today/SKILL.md"'
+ck "today: command = rail authorization"           'grep -qi "authorization to drive the rails" "$PLUGIN/skills/today/SKILL.md"'
+ck "today: surfaces overdue / due-soon"            'grep -qi "overdue" "$PLUGIN/skills/today/SKILL.md"'
+ck "week: weekly conversation framing"             'grep -qi "weekly board conversation" "$PLUGIN/skills/week/SKILL.md"'
+ck "priority: in-between cadence framing"          'grep -qi "in-between" "$PLUGIN/skills/priority/SKILL.md"'
+ck "arrange: confirm-gate dropped (consent)"       'grep -qi "no separate confirm gate" "$PLUGIN/skills/arrange/SKILL.md"'
 
 echo "════ RESULT: $P passed, $F failed ════"
 [ "$F" -eq 0 ]

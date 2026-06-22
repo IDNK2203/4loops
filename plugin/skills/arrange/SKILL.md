@@ -1,19 +1,15 @@
 ---
 name: arrange
-description: User-invoked task arranger — describe a batch of work in plain language and it drafts the stories onto the board, riding the rails so the board never goes stale. Proposes first; creates only on your explicit confirmation. Never sets priority on its own.
+description: User-invoked capture — brain-dump a batch of work in plain language and it drafts the stories onto the board (with type + deadline), riding the rails so the board never goes stale. You invoke it, so it captures from what you say; it never sets your priority. Run /today or /priority afterward to choose focus.
 allowed-tools: Bash, AskUserQuestion
 disable-model-invocation: true
 user-invocable: true
 argument-hint: "<describe the work you want to capture>"
 ---
 
-`/arrange` turns a brain-dump into board stories **without you hand-typing rail commands**. You describe a batch of work in natural language; the arranger parses it into stories, **proposes** them, and — only after you confirm — drafts them onto the board through the rails (so counts, the grid, and the log stay in sync). It captures and buckets; **it never decides your priority** — you set focus afterward.
+`/arrange` turns a brain-dump into board stories — no hand-typing rail commands. You describe a batch of work in plain language; I parse it into stories (with type + deadline) and draft them onto the board. **Invoking `/arrange` is your go** — I show you what I'm capturing, then create it. I don't reorganize or reprioritize; capture is all this does.
 
-This skill is **user-invoked only** (`disable-model-invocation: true`) — the main agent can never trigger it on its own. That's deliberate: arranging the board is the operator's call.
-
-## Usage
-
-`/arrange <describe the work>` — e.g. `/arrange I need to write the launch thread, fix the gate bug, and start sketching the demo video`.
+This skill is **user-invoked only** (`disable-model-invocation: true`) — the agent can never trigger it on its own.
 
 ## Steps
 
@@ -24,43 +20,35 @@ This skill is **user-invoked only** (`disable-model-invocation: true`) — the m
 cat .4loops/config 2>/dev/null
 ```
 
-Read the existing projects (the Projects table / `config`). If exactly one project exists, that's the default. If several, you'll ask which each item belongs to.
+Read existing projects (Projects table / `config`). One project → that's the default; several → infer per item, ask only if genuinely ambiguous. Note anything already on the board so you don't duplicate it.
 
-### 2. Parse the blurb into candidate stories
+### 2. Parse the blurb into stories
 
-From the user's description, extract discrete work items. For each, infer:
-- **project** — the project key (default to the sole project; ask if ambiguous).
-- **title** — a short imperative title (no trailing punctuation).
-- **type** — `dev` (objective fixed + testable) or `modeling` (objective fluid; emerges through discovery). Default `dev`.
-- **why** — a one-line rationale if the user gave one (optional).
+For each discrete work item, infer:
+- **project** — the project key (default to the sole project).
+- **title** — short imperative, no trailing punctuation.
+- **type** — `dev` (fixed, testable) or `modeling` (fluid, emerges). Default `dev`.
+- **deadline** — `YYYY-MM-DD` if the user gave or implied one (e.g. "by Friday"). Optional but encouraged — it's what drives drift later.
+- **why** / **doc** — one-line rationale / a doc path if mentioned.
 
-### 3. Propose — preview, do not create
+### 3. Show + create (the command was your go)
 
-Show the proposed batch as a preview (this creates nothing):
-
-```bash
-printf '%s\t%s\t%s\t%s\n' "<PROJECT>" "<TITLE>" "<TYPE>" "<WHY>" ... | "${CLAUDE_PLUGIN_ROOT}/scripts/vt-arrange.sh" --dry-run
-```
-
-Then AskUserQuestion: **Create all**, **Edit** (adjust titles/types/projects/drop items), or **Cancel**. Never skip this gate — `/arrange` proposes, the operator disposes.
-
-### 4. Create the confirmed batch (only on explicit go)
-
-Pipe the confirmed TSV (one `PROJECT⇥TITLE⇥TYPE⇥WHY` line per story) into the executor:
+Preview the batch (creates nothing), then create it — no separate confirm gate, since invoking `/arrange` is the consent:
 
 ```bash
-printf '%s\t%s\t%s\t%s\n' ... | "${CLAUDE_PLUGIN_ROOT}/scripts/vt-arrange.sh"
+# preview
+printf '%s\t%s\t%s\t%s\t%s\n' "<P>" "<title>" "<type>" "<why>" "<YYYY-MM-DD>" ... | "${CLAUDE_PLUGIN_ROOT}/scripts/vt-arrange.sh" --dry-run
+# create
+printf '%s\t%s\t%s\t%s\t%s\n' ... | "${CLAUDE_PLUGIN_ROOT}/scripts/vt-arrange.sh"
 "${CLAUDE_PLUGIN_ROOT}/scripts/vt-render.sh"
 ```
 
-Every story lands in **Backlog**. Stories ride the rails (`vt-draft`), so the board stays honest.
+Show the preview to the user as you create — if they immediately object, you've only drafted to Backlog (reversible via `/4loops:archive`). If a field was genuinely ambiguous (which project? a date you couldn't infer?), ask ONE tight question before creating.
 
-### 5. Hand priority back to the operator
+### 4. Hand priority back
 
-Do **not** set focus automatically. Tell the user the stories are on the board and they can run `/4loops:today` or `/4loops:priority add <id...>` to choose what to work on. Priority stays operator-owned.
+Every story lands in **Backlog**. Do **not** set focus — tell the user to run `/4loops:today` or `/4loops:priority add <id…>` to choose what to work on. Priority stays the operator's.
 
 ## Notes
 
-- Fields are tab-separated; titles/why must not contain tabs (the rails sanitize `|`).
-- If the user names something already on the board, say so rather than duplicating it.
-- Nothing is created before step 4's confirmation.
+- TSV fields are tab-separated; titles/why must not contain tabs (the rails sanitize `|`). DUE must be `YYYY-MM-DD` (invalid is dropped with a warning).

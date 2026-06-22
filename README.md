@@ -8,18 +8,20 @@ It operates on whatever workspace it is enabled in. All state is plain files und
 
 ## The loop
 
+**You drive 4loops by *talking to it*, not by typing state commands.** Four conversational
+commands move the board — you describe what happened in plain language and the agent reconciles it
+through the rails. Invoking one of these *is* your authorization; the board never moves on its own.
+
 | Command | What it does |
 | --- | --- |
 | `/4loops:configure` | **First-run setup** (run once): detect your projects, pick a week-start, confirm which surfaces the gate guards, then spawn this week's focus. |
-| `/4loops:today` | Daily board reconciliation; sets 1–3 focus stories and lifts the day's gate. |
-| `/4loops:week` | Weekly reconciliation; sets 3–5 anchors. Run first on a new ISO week. |
+| `/4loops:today` | **Daily conversation** — "shipped X, started Y, drop Z, add a post due Friday" → it moves states, captures new work, sets 1–3 focus, lifts the day's gate. Leads with overdue / due-soon. |
+| `/4loops:week` | **Weekly conversation** — wider lens; reconcile the week, set 3–5 anchors. Run first on a new ISO week. |
+| `/4loops:priority` | **In-between conversation** — when something lands between rituals: re-point focus, move a state, add urgent work. `add`/`set <id…>` for a direct nudge; `since` shows what's changed. |
+| `/4loops:arrange <blurb>` | **Capture** — brain-dump work in plain language; it drafts the stories (type + deadline) onto the board. User-invoked only; never sets priority. |
 | `/4loops:board` | Render the kanban. |
-| `/4loops:draft <title>` | Capture a new story-draft into Backlog. Add `--type modeling` for fluid-objective work, `--backdate YYYY-MM-DD` to record past work. |
-| `/4loops:arrange <blurb>` | **Describe a batch of work in plain language** — it proposes the stories, then drafts them onto the board on your confirm. User-invoked only; never sets priority. |
-| `/4loops:priority add\|set <id…>` | Re-point today's focus mid-week without the full ritual; `since` shows what's landed since you last set focus. |
-| `/4loops:plan` · `/4loops:start` · `/4loops:test` · `/4loops:done` | Move a story across states. |
-| `/4loops:archive <id>` | Retire a story off the board: `abandoned` (dropped) or `superseded --by <id>` (replaced) → `archive/<month>/`. |
-| `/4loops:close [--weekly]` | End-of-day drift retro; `--weekly` archives Done → `archive/`. |
+
+Capture carries **type** (`dev` / `modeling`) and an optional **deadline** (`--deadline YYYY-MM-DD`) — the deadline is what powers prioritization and drift. Under the hood, draft/transition/archive scripts are the rails the conversations call; you can invoke them directly (`/4loops:draft`, `:start`, `:done`, `:archive`, `:close --weekly`) but you rarely need to.
 
 ## How it enforces
 
@@ -51,7 +53,10 @@ The **hard-exempt** surfaces are always writable regardless of config — `.4loo
 
 The spine, hardened for daily driving:
 
+- **Talk to it, don't type at it** — `/today`, `/week`, `/priority`, and `/arrange` are natural-language conversations. You describe what happened; the agent reconciles the board through the rails. No more `/start`/`/done` typing — those are internal now.
 - **Story types** — `dev` (fixed objective, DONE = shipped) vs `modeling` (fluid objective, DONE = a coherent, traceable decision log). Modeling stories are marked ◆ on the board and reminded at DONE.
+- **Deadlines** — capture a `--deadline`; overdue and due-soon stories surface in drift and lead your daily/weekly prioritization (it's how you see you're going off-plan).
+- **Cleaner capture** — a story's context renders as a markdown link, not a bare file path (nicer board, better image exports).
 - **Honest endings** — retire work off the board with `/4loops:archive`: `abandoned` or `superseded --by <id>`, recorded in the month's archive. `--backdate YYYY-MM-DD` records retroactive work on its real date.
 - **Midweek re-point** — `/4loops:priority` adjusts today's focus between rituals; `priority since` surfaces what's landed since you last set focus, so new work doesn't silently outrun your priorities.
 - **`/4loops:arrange`** — brain-dump a batch of work in plain language; it proposes stories and drafts them onto the board on your confirm. User-invoked only — it never fires on its own and never sets your priority.

@@ -1,66 +1,57 @@
 ---
 name: week
-description: Weekly board-reconciliation ritual — review the week (Done already auto-archived by the rollover), reconcile what remains, then set this week's 3–5 anchor focus. Carry-forward defaults from last week's still-alive focus. Writes the Week section of current-priorities.md. Run first on a new ISO week, before /today.
+description: Weekly board reconciliation — talk through the week in plain language (what shipped, what carries over, what to drop or add) and it reconciles the board, captures new work, and sets this week's 3–5 anchors. Surfaces overdue / due-soon. Run first on a new ISO week, before /today.
 allowed-tools: Bash, AskUserQuestion
 user-invocable: true
 ---
 
-`/week` is the weekly **board-reconciliation ritual** (run first on a new ISO week, before `/today`). On the first session of a new ISO week the sentinel has already auto-fired the weekly rollover (Done → `archive/closed`, abandoned → `archive/abandoned`). Your job is to reconcile what remains and set the week's anchor focus.
+`/week` is your **weekly board conversation** — the wider lens, run first on a new ISO week before `/today`. Same idea as `/today`: you describe the week in plain language and I reconcile the board and set the week's anchors. The sentinel has already auto-archived last week's Done + abandoned (rollover); you reconcile what remains.
 
-## Usage
-
-`/week` — interactive weekly reconciliation.
+**Invoking this command authorizes me to drive the rails** — I apply your reconciliation from the conversation, no per-step confirmation. Only this (or `/today` · `/priority` · `/arrange`) moves the board.
 
 ## Steps
 
 ### 0. Require configuration
 
-This skill reconciles a **configured** board — it must not create a bare one. Check first:
-
 ```bash
 [ -f .4loops/config ] && echo CONFIGURED || echo UNCONFIGURED
 ```
 
-If `UNCONFIGURED`, stop here and tell the user: **"No 4loops board is configured in this directory yet — run `/4loops:configure` first to set up your projects, gates, and focus."** Do not run the steps below.
+If `UNCONFIGURED`, stop: **"No 4loops board is configured here yet — run `/4loops:configure` first."**
 
 ### 1. Orient
 
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/scripts/vt-render.sh"
-"${CLAUDE_PLUGIN_ROOT}/scripts/vt-drift.sh"
-"${CLAUDE_PLUGIN_ROOT}/scripts/vt-week.sh" --default
-"${CLAUDE_PLUGIN_ROOT}/scripts/vt-week.sh" --current
+"${CLAUDE_PLUGIN_ROOT}/scripts/vt-drift.sh"           # caps · OVERDUE · DUE-SOON · stale · abandon
+"${CLAUDE_PLUGIN_ROOT}/scripts/vt-week.sh" --default  # carry-forward (last week's still-alive focus)
 ```
 
-Save `--default` output as `SUGGESTED_FOCUS` (last week's focus still in planning/in-progress/testing).
+Confirm the rollover didn't sweep anything important (archive is append-only under `.4loops/archive/`, reversible). Lead with overdue / due-soon.
 
-### 2. Reconcile — batch multi-select (week lens)
+### 2. Listen, then reconcile (the board moves here)
 
-Same board-state selector as `/today`. Build ONE `AskUserQuestion` with up to three `multiSelect: true` questions (label = `ID — title`); omit empty ones:
+Map the user's plain-language account of the week to rail calls and run them — finish, carry over, park, drop, or capture new work (with `--type` and `--deadline`):
 
-- **Q1 — "Which are now Done?"** options = **Testing + In Progress** → `"${CLAUDE_PLUGIN_ROOT}/scripts/vt-transition.sh" <id> done`.
-- **Q2 — "Commit to this week from Backlog?"** options = **Backlog** → `"${CLAUDE_PLUGIN_ROOT}/scripts/vt-transition.sh" <id> planning` (scoped for the week; `/today` starts the day's subset).
-- **Q3 — "Stale items to drop/park?"** options = stale stories from `vt-drift.sh` → `"${CLAUDE_PLUGIN_ROOT}/scripts/vt-transition.sh" <id> backlog`.
+```bash
+"${CLAUDE_PLUGIN_ROOT}/scripts/vt-transition.sh" <id> done|backlog|abandoned|...
+"${CLAUDE_PLUGIN_ROOT}/scripts/vt-draft.sh" <P> "<title>" "<why>" "<doc>" --type <…> --deadline <YYYY-MM-DD>
+```
 
-Loop the transition script over each selected ID, then re-render. The weekly rollover already archived Done + abandoned at session start — confirm nothing important got swept (archive is append-only under `.4loops/archive/`, reversible).
+Capturing the *week's* new work with deadlines is what makes drift meaningful across the week. Re-render after. Recap-only request → just summarize and stop.
 
-### 3. Set week focus (3–5 anchors)
+### 3. Set the week's anchors (3–5)
 
-AskUserQuestion (single-select): Keep [SUGGESTED_FOCUS] / Edit / Skip. Week scope is broader than day — cap 3–5. Sanity-check IDs against the board.
-
-### 4. Write + show
+Propose anchors — carry-forward + anything overdue/due-soon first. Confirm or edit, then:
 
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/scripts/vt-week.sh" <ID1> ... <IDn>
 cat .4loops/current-priorities.md
 ```
 
-Preserves the Today section, refreshes activity slices, arms the rail. Then run `/today` to pick the day's subset.
+Preserves the Today section, refreshes slices, arms the rail. Then run `/today` to pick the day's 1–3 from these anchors.
 
-## Skip path
+## Notes
 
-Skip at step 3 → don't write. The week gate stays active until set; the sentinel re-prompts on the next session crossing the ISO-week boundary.
-
-## Relationship to /today
-
-`/week` sets the week's 3–5 anchors; `/today` selects the day's 1–3 from them. Set week first, refine daily.
+- `/week` sets the week's 3–5 anchors; `/today` selects the day's subset. Set week first, refine daily.
+- Priority stays **yours** — I propose, you decide. Mutations ride the rails; I never hand-edit `board.md`.

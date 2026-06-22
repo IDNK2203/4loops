@@ -1,40 +1,44 @@
 ---
 name: priority
-description: Midweek priority reconciliation — re-point today's focus between the daily/weekly rituals when new work lands, without rerunning the whole walk. Add to or replace today's focus, or surface what's been added since you last set focus. Freshens the Today stamp so the gate lifts.
+description: The in-between reconciliation — when something lands mid-day or mid-week between your /today and /week rituals, talk it through and re-point the board: move states, add new work, and adjust today's focus, without rerunning the full ritual. Surfaces what's changed and what's overdue / due-soon.
 allowed-tools: Bash, AskUserQuestion
 user-invocable: true
 ---
 
-`/priority` is the **lightweight midweek re-point**. When work lands after you've already run `/today`, you don't need the full reconciliation walk — just adjust focus and move on. Writing focus freshens the Today stamp, so this also lifts the day's gate.
+`/priority` is the **in-between cadence** — the quick conversation for when reality shifts between your `/today` and `/week` rituals. A new thing lands, a priority flips, something becomes urgent: you talk it through and I re-point the board and your focus, then move on. Lighter than `/today`, same authorization.
+
+**Invoking it authorizes me to drive the rails** — I apply the changes from what you tell me. Only this (or `/today` · `/week` · `/arrange`) moves the board.
 
 ## Usage
 
-- `/priority` — show what's landed since you last set focus, then offer to add/replace.
-- `/priority add <ID...>` — append stories to today's focus.
-- `/priority set <ID...>` — replace today's focus.
+- `/priority` — show what's changed since you last set focus, then re-point conversationally.
+- `/priority add <id…>` / `set <id…>` — direct focus adjustment (no conversation needed).
 
 ## Steps
 
-### 1. Surface what changed
+### 1. Surface what shifted
 
 ```bash
-"${CLAUDE_PLUGIN_ROOT}/scripts/vt-priority.sh" since
-"${CLAUDE_PLUGIN_ROOT}/scripts/vt-today.sh" --current
+"${CLAUDE_PLUGIN_ROOT}/scripts/vt-priority.sh" since      # drafted/moved since the last Today stamp, not in focus
+"${CLAUDE_PLUGIN_ROOT}/scripts/vt-drift.sh"               # OVERDUE · DUE-SOON · caps · stale
+"${CLAUDE_PLUGIN_ROOT}/scripts/vt-today.sh" --current     # today's focus now
 ```
 
-`since` lists stories drafted or moved since the current Today stamp that aren't already in focus — the candidates you might be silently outrunning. `--current` shows today's focus now.
+### 2. Re-point (the board moves here)
 
-### 2. Re-point (the operator decides)
-
-If the user named IDs, apply directly. Otherwise AskUserQuestion: **Add** the surfaced candidates, **Replace** focus with a new 1–3 list, or **Leave as is**.
+From the user's plain-language update, apply the relevant rails — capture new work, nudge a state, and adjust focus:
 
 ```bash
-"${CLAUDE_PLUGIN_ROOT}/scripts/vt-priority.sh" add <ID...>     # or: set <ID...>
+"${CLAUDE_PLUGIN_ROOT}/scripts/vt-draft.sh" <P> "<title>" "<why>" "<doc>" --type <…> --deadline <YYYY-MM-DD>   # new urgent thing
+"${CLAUDE_PLUGIN_ROOT}/scripts/vt-transition.sh" <id> in-progress|testing|done|...                            # nudge a state
+"${CLAUDE_PLUGIN_ROOT}/scripts/vt-priority.sh" add <id…>      # append to today's focus (dedup), freshen stamp
+"${CLAUDE_PLUGIN_ROOT}/scripts/vt-priority.sh" set <id…>      # replace today's focus
 cat .4loops/current-priorities.md
 ```
 
-The script dedups on `add`, freshens the Today stamp, arms the rail, and clears this session when the gate is fully clear. Priority stays **operator-owned** — propose, never auto-set. The file IS the message.
+`add`/`set` freshen the Today stamp (so the gate stays lifted) and re-arm/clear like `/today` does. Keep it quick — this is the in-between, not the full walk.
 
-## Errors
+## Notes
 
-Bad subcommand exits non-zero with a usage line — surface it and stop.
+- Priority stays **yours** — I propose what to bump given the drift, you decide. Mutations ride the rails.
+- For the full daily/weekly walk use `/today` / `/week`; for pure capture use `/arrange`.
