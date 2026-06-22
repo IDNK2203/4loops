@@ -15,6 +15,17 @@ iso_today()      { date +"%Y-%m-%d"; }
 iso_week_num()   { date +"%V"; }
 iso_year()       { date +"%G"; }
 
+# Validate a YYYY-MM-DD backdate and echo an ISO timestamp at noon UTC for it.
+# Echoes nothing + warns to stderr when malformed (caller falls back to "now").
+# Noon avoids any tz/DST edge nudging the calendar date. (W2: closes the
+# no-backdate gap — retroactive stories/transitions stamp the real date.)
+vt_backdate_ts() {
+  case "$1" in
+    [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]) printf '%sT12:00:00Z' "$1" ;;
+    *) echo "warn: ignoring invalid --backdate '$1' (want YYYY-MM-DD); using now." >&2 ;;
+  esac
+}
+
 # ── Week-start config (mon default | sun) ─────────────────────────────────────
 # The first day of the week is configurable per workspace via .4loops/config
 # (`week-start: mon|sun`). Default is Monday (ISO). Everything that needs a week

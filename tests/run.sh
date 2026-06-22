@@ -284,5 +284,32 @@ ck "type: dev DONE is silent (no note)"           '! printf "%s" "$DWARN" | grep
 ck "type: compact board marks modeling with ◆"    'bash "$S/vt-render.sh" | grep -q "◆"'
 unset VT_DIR
 
+echo
+echo "════ 10. Archive / abandon / supersede + backdate (W2, v2) ════"
+W10=$(mktemp -d); export VT_DIR="$W10/.4loops"
+MO=$(date +%Y-%m)
+A1=$(bash "$S/vt-draft.sh" T "dead idea"      | grep -oE 'T-[0-9]+')
+A2=$(bash "$S/vt-draft.sh" T "replaced idea"  | grep -oE 'T-[0-9]+')
+A3=$(bash "$S/vt-draft.sh" T "the replacement" | grep -oE 'T-[0-9]+')
+bash "$S/vt-transition.sh" "$A1" abandoned >/dev/null
+ck "abandon: removed from active board"        '! grep -q "'"$A1"'" "$VT_DIR/board.md"'
+ck "abandon: recorded in abandoned.md"         'grep -q "'"$A1"'" "$VT_DIR/archive/'"$MO"'/abandoned.md"'
+ck "abandon: archive note labels it abandoned" 'grep "'"$A1"'" "$VT_DIR/archive/'"$MO"'/abandoned.md" | grep -q "· abandoned"'
+ck "abandon: transition logged"                'grep "'"$A1"'" "$VT_DIR/transitions.log" | grep -q "abandoned"'
+bash "$S/vt-transition.sh" "$A2" superseded --by "$A3" >/dev/null
+ck "supersede: removed from active board"       '! grep -q "'"$A2"'" "$VT_DIR/board.md"'
+ck "supersede: records superseded-by link"      'grep "'"$A2"'" "$VT_DIR/archive/'"$MO"'/abandoned.md" | grep -q "superseded-by: '"$A3"'"'
+BD=$(bash "$S/vt-draft.sh" T "old work" --backdate 2026-01-15 | grep -oE 'T-[0-9]+')
+ck "backdate draft: log carries past date"      'grep "'"$BD"'" "$VT_DIR/transitions.log" | grep -q "^2026-01-15"'
+bash "$S/vt-transition.sh" "$BD" abandoned --backdate 2026-01-20 >/dev/null
+ck "backdate transition: filed under past month" 'grep -q "'"$BD"'" "$VT_DIR/archive/2026-01/abandoned.md"'
+ck "backdate transition: log is past-dated"      'grep "'"$BD"'" "$VT_DIR/transitions.log" | grep -q "^2026-01-20"'
+IB=$(bash "$S/vt-draft.sh" T "bad date" --backdate not-a-date 2>/dev/null | grep -oE 'T-[0-9]+')
+ck "backdate invalid: story still created"       'grep -q "'"$IB"'" "$VT_DIR/board.md"'
+DN=$(bash "$S/vt-draft.sh" T "shipped" | grep -oE 'T-[0-9]+'); bash "$S/vt-transition.sh" "$DN" done >/dev/null
+ck "terminal: refuse abandon of a Done story"    '! bash "$S/vt-transition.sh" "$DN" abandoned 2>/dev/null'
+ck "abandon: board stays valid (counts line)"    'grep -q "^\*\*Counts:\*\*" "$VT_DIR/board.md"'
+unset VT_DIR
+
 echo "════ RESULT: $P passed, $F failed ════"
 [ "$F" -eq 0 ]

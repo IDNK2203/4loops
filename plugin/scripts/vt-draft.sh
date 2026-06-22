@@ -11,11 +11,13 @@ set -euo pipefail
 
 # Pull the --type flag out of anywhere in the arg list; the rest stay positional.
 TYPE="dev"
+BACKDATE=""
 ARGS=()
 while [ $# -gt 0 ]; do
   case "$1" in
-    --type) TYPE="${2:-dev}"; shift 2 ;;
-    *)      ARGS+=("$1"); shift ;;
+    --type)     TYPE="${2:-dev}"; shift 2 ;;
+    --backdate) BACKDATE="${2:-}"; shift 2 ;;
+    *)          ARGS+=("$1"); shift ;;
   esac
 done
 set -- ${ARGS[@]+"${ARGS[@]}"}
@@ -83,6 +85,11 @@ echo "$NEW_ROW" >> "$BOARD"
 "$SCRIPT_DIR/vt-refresh-counts.sh"
 
 TS=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+case "$BACKDATE" in
+  '') ;;
+  [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]) TS="${BACKDATE}T12:00:00Z" ;;
+  *) echo "warn: ignoring invalid --backdate '$BACKDATE' (want YYYY-MM-DD); using now." >&2 ;;
+esac
 printf "%s\t%s\t%s\n" "$TS" "$ID" "∅→backlog" >> "$VT_DIR/transitions.log"
 
 echo "Created ${ID}: ${TITLE}"
