@@ -135,14 +135,21 @@ story_title() {
 # token is present (v1 rows, and v2 dev rows which omit the token). The matched
 # tail is pure ASCII ("type: <word>"), so RSTART/RLENGTH offsets stay byte-safe
 # despite the multibyte em-dash elsewhere in the cell.
+# CELL-SCOPED: the dense grid packs many stories on one physical line, so we
+# isolate THIS story's |-delimited cell before matching — a line scan would grab
+# a neighbouring cell's token (the `**id**` anchor makes prefix collisions safe).
 story_type() {
   local id="$1"
   [ ! -f "$BOARD" ] && { echo dev; return; }
   awk -v id="$id" '
     index($0, "**" id "**") {
-      if (match($0, /type: [a-z]+/)) {
-        t = substr($0, RSTART + 6, RLENGTH - 6)   # "type: " = 6 ASCII bytes
-        if (t == "dev" || t == "modeling") { print t; exit }
+      n = split($0, cells, "|")
+      for (i = 1; i <= n; i++) if (index(cells[i], "**" id "**")) {
+        if (match(cells[i], /type: [a-z]+/)) {
+          t = substr(cells[i], RSTART + 6, RLENGTH - 6)   # "type: " = 6 ASCII bytes
+          if (t == "dev" || t == "modeling") { print t; exit }
+        }
+        print "dev"; exit
       }
       print "dev"; exit
     }
@@ -151,13 +158,18 @@ story_type() {
 
 # Return a story's deadline (YYYY-MM-DD) or empty. ASCII-anchored match keeps
 # RSTART/RLENGTH byte-safe past the multibyte em-dash. (W7: deadlines drive
-# prioritization + drift.)
+# prioritization + drift.) CELL-SCOPED for the same reason as story_type — the
+# dense grid co-locates stories on one line, so match within this cell only.
 story_deadline() {
   local id="$1"
   [ ! -f "$BOARD" ] && return
   awk -v id="$id" '
     index($0, "**" id "**") {
-      if (match($0, /due: [0-9]+-[0-9]+-[0-9]+/)) print substr($0, RSTART + 5, 10)  # "due: " = 5 ASCII bytes
+      n = split($0, cells, "|")
+      for (i = 1; i <= n; i++) if (index(cells[i], "**" id "**")) {
+        if (match(cells[i], /due: [0-9]+-[0-9]+-[0-9]+/)) print substr(cells[i], RSTART + 5, 10)  # "due: " = 5 ASCII
+        exit
+      }
       exit
     }
   ' "$BOARD"

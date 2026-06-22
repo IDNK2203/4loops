@@ -442,5 +442,32 @@ ck "priority: in-between cadence"               'grep -qi "in-between" "$PLUGIN/
 ck "arrange: user-invoked only (capture)"       'grep -q "disable-model-invocation: true" "$PLUGIN/skills/arrange/SKILL.md"'
 ck "configure: pin-the-board onboarding tip"    'grep -qi "pin" "$PLUGIN/skills/configure/SKILL.md"'
 
+echo
+echo "════ 18. Dense-grid cell-scoping — lookups must not bleed across co-located cells (regression) ════"
+# The dense grid packs MANY stories onto one physical line. A per-LINE scan grabs a
+# neighbour cell's due:/type: token (caught live in the beta sandbox: drift mis-read every
+# deadline). story_type/story_deadline must isolate the story's own |-delimited CELL.
+W18=$(mktemp -d); export VT_DIR="$W18/.4loops"; mkboard "$VT_DIR"; : > "$VT_DIR/transitions.log"
+BOARD="$VT_DIR/board.md"; TRANSITIONS="$VT_DIR/transitions.log"; PRIORITIES="$VT_DIR/current-priorities.md"
+# shellcheck source=/dev/null
+source "$S/vt-priorities-lib.sh"; source "$S/vt-drift-lib.sh"
+DPAST=$(date -v-5d +%F 2>/dev/null || date -d '5 days ago' +%F)
+DFAR=$(date -v+30d +%F 2>/dev/null || date -d '30 days' +%F)
+# ONE physical line, five co-located cells: Backlog | Planning | InProgress | Testing | Done
+cat >> "$BOARD" <<EOF
+| [P0] **P0-400** alpha — type: modeling — due: $DFAR | [P0] **P0-401** beta — due: $DPAST | [P0] **P0-402** gamma no-due | [P0] **P0-404** epsilon — due: $DPAST | [P0] **P0-403** delta done — due: $DPAST |
+EOF
+ck "dense: deadline scoped to own cell (not neighbour)" '[ "$(story_deadline P0-400)" = "'"$DFAR"'" ]'
+ck "dense: no-due story stays empty despite neighbours" '[ -z "$(story_deadline P0-402)" ]'
+ck "dense: 2nd-cell deadline reads its own date"        '[ "$(story_deadline P0-401)" = "'"$DPAST"'" ]'
+ck "dense: type scoped to own cell"                     '[ "$(story_type P0-400)" = "modeling" ]'
+ck "dense: neighbour of modeling stays dev"             '[ "$(story_type P0-401)" = "dev" ]'
+OV18=$(find_overdue)
+ck "dense: overdue flags the right active stories"      'printf "%s" "$OV18" | grep -q "P0-401" && printf "%s" "$OV18" | grep -q "P0-404"'
+ck "dense: overdue ignores far-future co-located"       '! printf "%s" "$OV18" | grep -q "P0-400"'
+ck "dense: overdue ignores no-due co-located"           '! printf "%s" "$OV18" | grep -q "P0-402"'
+ck "dense: overdue ignores DONE co-located"             '! printf "%s" "$OV18" | grep -q "P0-403"'
+unset VT_DIR
+
 echo "════ RESULT: $P passed, $F failed ════"
 [ "$F" -eq 0 ]

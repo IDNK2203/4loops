@@ -74,39 +74,64 @@ find_sandbox() {  # <name> → echo root, or return 1. Require the .sandbox-meta
 }
 
 # ── Builders ──────────────────────────────────────────────────────────────────
-scaffold_mock() {  # <workspace> — realistic mock tree. Gated-ness comes from the PATH
-  local ws="$1"    # (matches vt_gated_globs defaults), NOT the content. Keep files NEUTRAL:
-                   # meta-text like "this is gated" makes the model self-refuse by reading it
-                   # instead of attempting the edit and letting the rail decide. Which paths
-                   # are gated is documented in README / the launch walk, never in the files.
-  mkdir -p "$ws/projects/acme-demo/content" \
-           "$ws/projects/acme-demo/repo-scaffolding" \
-           "$ws/projects/acme-demo/gists" \
-           "$ws/projects/acme-demo/src" \
-           "$ws/study"
-  printf '# Launch post — draft\n\nAcme is live. What we shipped and why it matters.\n\n- intro hook\n- 3 feature highlights\n- CTA\n' \
-    > "$ws/projects/acme-demo/content/post.md"
-  printf '# acme-demo\n\nScaffolding for the acme demo project.\n' \
-    > "$ws/projects/acme-demo/repo-scaffolding/README.md"
-  printf '// acme-demo embeddable snippet\nexport function greet(name) {\n  return `Hello, ${name}!`;\n}\n' \
-    > "$ws/projects/acme-demo/gists/snippet.js"
-  printf '// acme-demo app entrypoint\nconsole.log("acme app starting");\n' \
-    > "$ws/projects/acme-demo/src/app.js"
-  printf '# Study notes\n\nScratch space for research and to-dos.\n' \
-    > "$ws/study/notes.md"
+scaffold_mock() {  # <workspace> — a realistic solo-dev machine, NOT a toy. vt-detect runs in
+  local ws="$1"    # "workspace mode": top-level GIT REPOS become Projects (so /configure has
+                   # real things to find), a non-git folder is an Area, study/ is hard-exempt.
+                   # Gated-ness comes from the PATH (matches vt's default globs), NOT the content —
+                   # keep files NEUTRAL (no "this is gated" meta-text, or the model self-refuses by
+                   # reading instead of attempting the edit and letting the rail decide).
+
+  # ── web-app — frontend repo (a real .git → detected as a Project) ──
+  mkdir -p "$ws/web-app/src/components" "$ws/web-app/public"
+  printf '# web-app\n\nMarketing site + customer dashboard. React + Vite.\n' > "$ws/web-app/README.md"
+  printf '{\n  "name": "web-app",\n  "version": "0.1.0",\n  "type": "module"\n}\n' > "$ws/web-app/package.json"
+  printf 'import { Dashboard } from "./components/Dashboard";\n\nexport default function App() {\n  return <Dashboard />;\n}\n' > "$ws/web-app/src/App.jsx"
+  printf 'export function Dashboard() {\n  // TODO: wire up the live metrics panel\n  return <div className="dashboard">metrics go here</div>;\n}\n' > "$ws/web-app/src/components/Dashboard.jsx"
+  ( cd "$ws/web-app" && git init -q )
+
+  # ── api-service — backend repo (second Project) ──
+  mkdir -p "$ws/api-service/src/routes"
+  printf '# api-service\n\nNode/Express API behind the dashboard.\n' > "$ws/api-service/README.md"
+  printf 'import express from "express";\nconst app = express();\napp.get("/health", (_req, res) => res.json({ ok: true }));\napp.listen(3000);\n' > "$ws/api-service/src/server.js"
+  printf 'import { Router } from "express";\nexport const metrics = Router();\n// TODO: the dashboard is blocked on this aggregation endpoint\nmetrics.get("/", (_req, res) => res.json([]));\n' > "$ws/api-service/src/routes/metrics.js"
+  ( cd "$ws/api-service" && git init -q )
+
+  # ── docs — a non-git Area: evolving notes, no done-state → untracked, always free to edit ──
+  mkdir -p "$ws/docs"
+  printf '# Product notes\n\nRolling scratchpad.\n\n- realtime vs 1-min-polled metrics? (decide before the endpoint)\n- pricing page copy needs a rewrite\n' > "$ws/docs/notes.md"
+
+  # ── study — hard-exempt by default (research is never gated, even mid-project) ──
+  mkdir -p "$ws/study"
+  printf '# Study\n\nReading + research links. Always writable, gate or no gate.\n' > "$ws/study/reading.md"
 }
 
-seed_board() {  # <vt_dir> — drive the REAL vt CLI so seeding exercises it too
-  local vtdir="$1"
-  VT_DIR="$vtdir" bash "$PLUGIN_SCRIPTS/vt-draft.sh" DEMO "Wire up the landing page" "build" "projects/acme-demo/content/" >/dev/null
-  VT_DIR="$vtdir" bash "$PLUGIN_SCRIPTS/vt-draft.sh" DEMO "Draft launch thread"      "share" >/dev/null
-  VT_DIR="$vtdir" bash "$PLUGIN_SCRIPTS/vt-draft.sh" DEMO "Set up CI"                "build" >/dev/null
-  VT_DIR="$vtdir" bash "$PLUGIN_SCRIPTS/vt-draft.sh" DEMO "Write API docs"           "build" >/dev/null
-  VT_DIR="$vtdir" bash "$PLUGIN_SCRIPTS/vt-draft.sh" DEMO "Ship v0.1"                "build" >/dev/null
-  VT_DIR="$vtdir" bash "$PLUGIN_SCRIPTS/vt-transition.sh" DEMO-002 planning    >/dev/null
-  VT_DIR="$vtdir" bash "$PLUGIN_SCRIPTS/vt-transition.sh" DEMO-003 in-progress >/dev/null
-  VT_DIR="$vtdir" bash "$PLUGIN_SCRIPTS/vt-transition.sh" DEMO-004 testing     >/dev/null
-  VT_DIR="$vtdir" bash "$PLUGIN_SCRIPTS/vt-transition.sh" DEMO-005 done        >/dev/null
+seed_board() {  # <vt_dir> — drive the REAL vt CLI so seeding exercises it too. v2.1-rich:
+  local vtdir="$1"  # types (dev/modeling) + deadlines (computed relative to today, so overdue /
+  local d_over d_soon d_wk d_next  # due-soon ALWAYS fire) + a spread across all five states.
+  d_over=$(date -v-3d  +%F 2>/dev/null || date -d '3 days ago' +%F)  # already overdue
+  d_soon=$(date -v+1d  +%F 2>/dev/null || date -d '1 day'      +%F)  # due tomorrow (due-soon)
+  d_wk=$(  date -v+5d  +%F 2>/dev/null || date -d '5 days'     +%F)  # later this week
+  d_next=$(date -v+12d +%F 2>/dev/null || date -d '12 days'    +%F)  # next sprint
+  draft() { VT_DIR="$vtdir" bash "$PLUGIN_SCRIPTS/vt-draft.sh"      "$@" >/dev/null; }
+  move()  { VT_DIR="$vtdir" bash "$PLUGIN_SCRIPTS/vt-transition.sh" "$@" >/dev/null; }
+
+  # web-app (prefix WEB) — IDs land WEB-001..003 in draft order
+  draft WEB "Wire up the live metrics panel" "dashboard shell is empty"  "web-app/src/components/Dashboard.jsx" --deadline "$d_soon"
+  draft WEB "Rewrite the pricing page copy"  ""                          "docs/notes.md"                       --deadline "$d_next"
+  draft WEB "Ship dashboard v0.1"            "first usable cut"          ""                                    --deadline "$d_over"
+  # api-service (prefix API) — IDs land API-001..004
+  draft API "Add metrics aggregation endpoint" "the dashboard is blocked on this" "api-service/src/routes/metrics.js" --deadline "$d_soon"
+  draft API "Decide realtime vs polled metrics" "shapes the whole data path" "docs/notes.md" --type modeling --deadline "$d_wk"
+  draft API "Set up CI"                         ""                              ""              --deadline "$d_wk"
+  draft API "Add request logging"
+
+  # spread across states — leaves a believable mid-week board (backlog·planning·in-progress·testing·done)
+  move WEB-001 in-progress   # due-soon, actively being worked
+  move WEB-003 testing       # OVERDUE + in Testing — a real "deadline slipped" signal
+  move API-001 in-progress   # due-soon, the blocker
+  move API-002 planning      # the ◆ modeling decision
+  move API-003 done          # CI shipped
+
   : > "$vtdir/.armed"   # pre-arm: armed + stale focus = gate active, so B1 is demoable immediately
 }
 
@@ -164,18 +189,29 @@ print_launch() {  # <root> <workspace>
   esac
   echo
   if [ "$EMPTY" = true ]; then
-    echo "Walk (virgin): confirm 4loops is SILENT (no .4loops yet) → /4loops:configure"
-    echo "       (detect → confirm projects/week-start/gated → bootstrap spawns this week's focus)."
+    echo "Walk (virgin onboarding — the new-user first hour):"
+    echo "       · confirm 4loops is SILENT (no .4loops yet — no board, no nagging)"
+    echo "       · /4loops:configure → it detects web-app + api-service (git repos) as Projects,"
+    echo "         docs/ as an Area; you confirm, pick a week-start, confirm gated, then brain-dump"
+    echo "         this week's anchors → it spawns them onto the board and lands on a live kanban."
+    echo "       · then drive the loop: /4loops:today daily, /4loops:week on a new week."
   else
-    echo "Walk:  sentinel renders (B3)"
-    echo "       · ATTEMPT an Edit to projects/acme-demo/content/post.md (don't pre-judge it)"
-    echo "         → the Edit tool returns the PreToolUse hook denial = B1, the thesis"
-    echo "       · edit study/notes.md → allowed (exempt)"
-    echo "       · /4loops:week THEN /4loops:today (fresh board = new ISO week, both needed) → retry"
-    echo "         the gated edit, same session → now allowed = B2"
-    echo "       · the reconciliation shows the multiSelect groups, labels → IDs = B5"
-    [ "$INSTALL" = real ] && echo "       · bump version → /plugin update → /reload-plugins → new hooks run (B4)"
+    echo "Walk (seeded — a believable mid-week board, drive the real loop):"
+    echo "       · sentinel renders the board on session start; drift LEADS with overdue / due-soon"
+    echo "       · ATTEMPT an Edit to web-app/src/components/Dashboard.jsx (a gated Project; don't"
+    echo "         pre-judge it) → the PreToolUse hook DENIES it = the gate, the thesis"
+    echo "       · edit docs/notes.md → allowed (an untracked Area); study/reading.md → always allowed"
+    echo "       · /4loops:week THEN /4loops:today (fresh board = new ISO week) → see-then-pick:"
+    echo "         board prints once, structured multi-select (started/done/retire), then your focus"
+    echo "       · retry the gated edit, same session → now ALLOWED (reconciled)"
+    echo "       · /4loops:arrange \"<brain-dump of 2-3 new tasks>\" → it drafts them with type+deadline"
+    echo "       · in /4loops:week, the 'Retire' group abandons/supersedes a dead story off the board"
+    echo "       · note ◆ on the modeling story (API-002) + the due dates on the cells"
+    if [ "$INSTALL" = real ]; then
+      echo "       · bump version → /plugin update → /reload-plugins → new hooks run (B4)"
+    fi
   fi
+  return 0
 }
 
 # ── Commands ──────────────────────────────────────────────────────────────────
