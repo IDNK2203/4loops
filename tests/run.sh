@@ -311,5 +311,29 @@ ck "terminal: refuse abandon of a Done story"    '! bash "$S/vt-transition.sh" "
 ck "abandon: board stays valid (counts line)"    'grep -q "^\*\*Counts:\*\*" "$VT_DIR/board.md"'
 unset VT_DIR
 
+echo
+echo "════ 11. Midweek priority reconciliation (W3, v2) ════"
+W11=$(mktemp -d); export VT_DIR="$W11/.4loops"
+# shellcheck source=/dev/null
+source "$S/vt-priorities-lib.sh"
+P1=$(bash "$S/vt-draft.sh" T "first"  | grep -oE 'T-[0-9]+')
+P2=$(bash "$S/vt-draft.sh" T "second" | grep -oE 'T-[0-9]+')
+bash "$S/vt-today.sh" "$P1" >/dev/null
+ck "priority: today focus starts as P1"           '[ "$(read_focus today)" = "'"$P1"'" ]'
+bash "$S/vt-priority.sh" add "$P2" >/dev/null
+ck "priority add: appends P2 to focus"            'printf "%s" "$(read_focus today)" | grep -q "'"$P2"'"'
+ck "priority add: keeps P1 in focus"              'printf "%s" "$(read_focus today)" | grep -q "'"$P1"'"'
+bash "$S/vt-priority.sh" add "$P1" >/dev/null
+ck "priority add: no duplicate on re-add"         '[ "$(read_focus today | grep -oE "'"$P1"'" | wc -l | tr -d " ")" = "1" ]'
+ck "priority add: today stamp current (gate lift)" '[ "$(read_today_stamp)" = "$(iso_today)" ]'
+P3=$(bash "$S/vt-draft.sh" T "added later" | grep -oE 'T-[0-9]+')
+SINCE=$(bash "$S/vt-priority.sh" since)
+ck "priority since: surfaces newly-added P3"      'printf "%s" "$SINCE" | grep -q "'"$P3"'"'
+ck "priority since: omits already-focused P1"     '! printf "%s" "$SINCE" | grep -q "'"$P1"'"'
+bash "$S/vt-priority.sh" set "$P3" >/dev/null
+ck "priority set: replaces focus with P3 only"    '[ "$(read_focus today)" = "'"$P3"'" ]'
+ck "priority: bad subcommand errors"              '! bash "$S/vt-priority.sh" bogus 2>/dev/null'
+unset VT_DIR
+
 echo "════ RESULT: $P passed, $F failed ════"
 [ "$F" -eq 0 ]

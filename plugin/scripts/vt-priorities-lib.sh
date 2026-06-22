@@ -149,6 +149,25 @@ story_type() {
   ' "$BOARD"
 }
 
+# Stories that got a transition on/after <date> and are currently active (not
+# done / not off-board), minus a space-delimited exclude list. One "<id>  <title>"
+# per line. Used by midweek reconciliation (W3) to surface "what landed since you
+# last set focus" so priority gets reconsidered, not silently outrun by new work.
+stories_since() {
+  local since="$1" exclude=" ${2:-} " id t st
+  [ -f "$TRANSITIONS" ] || return 0
+  awk -F'\t' -v since="$since" '{ d=substr($1,1,10); if (d >= since) print $2 }' "$TRANSITIONS" \
+    | awk '!seen[$0]++' \
+    | while read -r id; do
+        [ -z "$id" ] && continue
+        case "$exclude" in *" $id "*) continue ;; esac
+        st=$(story_state "$id")
+        case "$st" in done|"") continue ;; esac
+        t=$(story_title "$id")
+        if [ -n "$t" ]; then echo "${id}  ${t}"; else echo "$id"; fi
+      done
+}
+
 # Read the date stamp from "## Today (YYYY-MM-DD)" — returns YYYY-MM-DD or empty.
 # Uses [(] / [)] character classes — BSD awk rejects literal/escaped parens in regex.
 read_today_stamp() {
