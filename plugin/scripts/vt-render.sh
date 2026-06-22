@@ -27,20 +27,37 @@ COUNT=5
 PROJECT=""
 SHOW_ALL=false
 LIST=false
+PRIO=false
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    --project)  PROJECT="$2"; shift 2 ;;
-    --all)      SHOW_ALL=true; shift ;;
-    --count)    COUNT="$2"; shift 2 ;;
-    --list)     LIST=true; shift ;;
+    --project)    PROJECT="$2"; shift 2 ;;
+    --all)        SHOW_ALL=true; shift ;;
+    --count)      COUNT="$2"; shift 2 ;;
+    --list)       LIST=true; shift ;;
+    --priorities) PRIO=true; shift ;;
     backlog|planning|in-progress|testing|done) STATE="$1"; shift ;;
-    [0-9]*)     COUNT="$1"; shift ;;
+    [0-9]*)       COUNT="$1"; shift ;;
     *) echo "Unknown arg: $1" >&2; exit 1 ;;
   esac
 done
 
 $SHOW_ALL && COUNT=99999
+
+# --priorities overlays the orient markers onto the full board: ★ today's focus,
+# ! overdue, ⏳ due-soon (◆ modeling is always shown). Gated so default output is
+# byte-identical. Focus comes from current-priorities' Today section; dates from cells.
+TODAY_N=""; SOON_N=""; FOCUS=""
+if $PRIO; then
+  TODAY_N=$(date +%Y%m%d)
+  SOON_N=$(date -v+"${DRIFT_DUE_SOON_DAYS:-3}"d +%Y%m%d 2>/dev/null \
+           || date -d "today +${DRIFT_DUE_SOON_DAYS:-3} days" +%Y%m%d)
+  # Only the Today *Focus:* line — NOT the in-progress/completed bullets (those would
+  # star finished work too).
+  FOCUS=$(awk '/^## Today/{f=1;next} /^## Week/{f=0} f && /^Focus:/{print; exit}' \
+            "$VT_DIR/current-priorities.md" 2>/dev/null \
+          | grep -oE '[A-Z][A-Z0-9]*-[0-9]+' | tr '\n' ' ')
+fi
 
 case "$STATE" in
   backlog)     COL=1 ;;
@@ -53,6 +70,7 @@ esac
 
 awk -F'|' \
   -v col="$COL" -v cap="$COUNT" -v project="$PROJECT" -v list="$LIST" \
+  -v prio="$PRIO" -v today="$TODAY_N" -v soon="$SOON_N" -v focus=" $FOCUS " \
   '
   BEGIN {
     state_names[1] = "Backlog"
@@ -66,10 +84,22 @@ awk -F'|' \
   # Compact a board cell to "[PROJ] **ID** Title" with the title truncated,
   # dropping the — why: / — context: tail. Preserves the bold **ID** so the
   # truncation never splits a markdown marker.
-  function compact(c,   p, t, mark) {
-    # A modeling story gets a ◆ glance-marker so the board reads honestly at a
-    # glance (detected before the metadata tail is stripped).
-    mark = (c ~ /type: modeling/) ? "◆ " : ""
+  # colnum (1..5) lets us suppress deadline markers on Done. In --priorities mode
+  # the mark string layers ★ focus · ! overdue · ⏳ due-soon onto the always-on ◆.
+  function compact(c, colnum,   p, t, mark, id, due, dn) {
+    # Glance-markers are detected BEFORE the metadata tail is stripped.
+    mark = (c ~ /type: modeling/) ? "◆" : ""
+    if (prio == "true") {
+      id = ""
+      if (match(c, /\*\*[^*]+\*\*/)) id = substr(c, RSTART + 2, RLENGTH - 4)
+      if (id != "" && index(focus, " " id " ")) mark = mark "★"
+      if (colnum != 5 && match(c, /due: [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]/)) {
+        due = substr(c, RSTART + 5, 10); dn = due; gsub(/-/, "", dn)
+        if (dn + 0 < today + 0)        mark = mark "!"
+        else if (dn + 0 <= soon + 0)   mark = mark "⏳"
+      }
+    }
+    if (mark != "") mark = mark " "
     sub(/ — (why|context|type|due):.*/, "", c)
     if (match(c, /^\[[^]]*\] \*\*[^*]*\*\* /)) {
       p = substr(c, 1, RLENGTH); t = substr(c, RLENGTH + 1)
@@ -141,11 +171,11 @@ awk -F'|' \
       print "| _(empty)_ | _(empty)_ | _(empty)_ | _(empty)_ | _(empty)_ |"
     } else {
       for (i = 1; i <= rows; i++) {
-        c1 = (i <= n1) ? compact(cells[1, i]) : ""
-        c2 = (i <= n2) ? compact(cells[2, i]) : ""
-        c3 = (i <= n3) ? compact(cells[3, i]) : ""
-        c4 = (i <= n4) ? compact(cells[4, i]) : ""
-        c5 = (i <= n5) ? compact(cells[5, i]) : ""
+        c1 = (i <= n1) ? compact(cells[1, i], 1) : ""
+        c2 = (i <= n2) ? compact(cells[2, i], 2) : ""
+        c3 = (i <= n3) ? compact(cells[3, i], 3) : ""
+        c4 = (i <= n4) ? compact(cells[4, i], 4) : ""
+        c5 = (i <= n5) ? compact(cells[5, i], 5) : ""
         printf "| %s | %s | %s | %s | %s |\n", c1, c2, c3, c4, c5
       }
     }
