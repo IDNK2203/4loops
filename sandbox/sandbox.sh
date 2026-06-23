@@ -132,6 +132,15 @@ seed_board() {  # <vt_dir> — drive the REAL vt CLI so seeding exercises it too
   move API-002 planning      # the ◆ modeling decision
   move API-003 done          # CI shipped
 
+  # Write a REAL config so the seeded sandbox is an already-configured day-5 workspace
+  # (names the projects, sets week-start + gated globs) — otherwise /today/week/task-nav
+  # hit UNCONFIGURED and the gate can't enforce.
+  cfg() { VT_DIR="$vtdir" bash "$PLUGIN_SCRIPTS/vt-config.sh" "$@" >/dev/null; }
+  cfg project WEB "web-app"     web-app
+  cfg project API "api-service" api-service
+  cfg week-start mon
+  cfg gated "web-app/*" "api-service/*"
+
   : > "$vtdir/.armed"   # pre-arm: armed + stale focus = gate active, so B1 is demoable immediately
 }
 
