@@ -1,5 +1,5 @@
 ---
-name: task-nav
+name: nav
 description: The intra-cadence loop — invoke once, then just talk. Between your daily/weekly rituals, this is where you move the board by speaking: new tasks, state moves, priority changes, retirements. It opens on a priority-annotated board (where you are vs today's/this week's focus), then turns plain language into real rail operations. User-invoked only; the invocation is your standing okay for the session.
 allowed-tools: Bash, AskUserQuestion
 disable-model-invocation: true
@@ -7,14 +7,14 @@ user-invocable: true
 argument-hint: "[optional: say what changed, or just open it and talk]"
 ---
 
-`/task-nav` is the **conversational, intra-cadence** surface — the high-traffic space *between*
+`/nav` is the **conversational, intra-cadence** surface — the high-traffic space *between*
 `/today` and `/week`. You open it once and then **talk**: "new task: add rate limiting, high
 priority", "the metrics endpoint is done", "bump auth to the top", "drop the pricing copy". It
 maps each thing you say to a real board operation and **runs it on the rails** — you never type
 `/capture` / `/manage` / `/prioritize` or remember a state command. The loops (capture · check ·
 prioritize) are the engine; talking is the whole interface.
 
-**Invoking `/task-nav` is your standing consent for this working session.** Once it's open, treat the
+**Invoking `/nav` is your standing consent for this working session.** Once it's open, treat the
 user's subsequent messages as intra-cadence operations and move the pieces — no per-action
 re-confirmation (the board still can't move itself; only this invoked session moves it). When the
 user shifts to other work, you simply stop; everything you did is already on the board.
@@ -94,9 +94,9 @@ the board already reflects everything, because every change rode a rail.
 ## Notes
 
 - This never lifts the daily/weekly **gate** — that's `/today` / `/week`'s job (the deliberate
-  reconciliation). `/task-nav` is the lightweight in-between; if focus is stale, nudge the user toward
+  reconciliation). `/nav` is the lightweight in-between; if focus is stale, nudge the user toward
   `/today`, but don't block their flow.
 - For a deliberate, structured pass (see-the-board-then-pick checkboxes), that's `/today` / `/week`.
-  `/task-nav` is the talk-don't-click path. Same rails underneath.
+  `/nav` is the talk-don't-click path. Same rails underneath.
 - The rails underneath (`vt-draft.sh`, `vt-transition.sh`, `vt-priority.sh`) are the same ones the
   rituals use; talking here just drives them conversationally instead of via checkboxes.
