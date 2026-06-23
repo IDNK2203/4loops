@@ -53,7 +53,7 @@ INSTALL (isolated only)
 
 SEED
   --seeded     (default) stories across states + pre-armed rail + stale focus (B1 demoable now)
-  --empty      virgin workspace (no board) — walk /4loops:arrange → /4loops:today from scratch
+  --empty      virgin workspace (no board) — walk /4loops:configure → /4loops:week → /nav from scratch
 EOF
 }
 
@@ -203,18 +203,17 @@ print_launch() {  # <root> <workspace>
     echo "       · /4loops:configure → it detects web-app + api-service (git repos) as Projects,"
     echo "         docs/ as an Area; you confirm, pick a week-start, confirm gated, then brain-dump"
     echo "         this week's anchors → it spawns them onto the board and lands on a live kanban."
-    echo "       · then drive the loop: /4loops:today daily, /4loops:week on a new week."
+    echo "       · then drive: /4loops:week (first, on a new week) → /4loops:today, and /nav to just talk."
   else
     echo "Walk (seeded — a believable mid-week board, drive the real loop):"
     echo "       · sentinel renders the board on session start; drift LEADS with overdue / due-soon"
     echo "       · ATTEMPT an Edit to web-app/src/components/Dashboard.jsx (a gated Project; don't"
     echo "         pre-judge it) → the PreToolUse hook DENIES it = the gate, the thesis"
     echo "       · edit docs/notes.md → allowed (an untracked Area); study/reading.md → always allowed"
-    echo "       · /4loops:week THEN /4loops:today (fresh board = new ISO week) → see-then-pick:"
-    echo "         board prints once, structured multi-select (started/done/retire), then your focus"
-    echo "       · retry the gated edit, same session → now ALLOWED (reconciled)"
-    echo "       · /4loops:arrange \"<brain-dump of 2-3 new tasks>\" → it drafts them with type+deadline"
-    echo "       · in /4loops:week, the 'Retire' group abandons/supersedes a dead story off the board"
+    echo "       · /4loops:today on a fresh week is REFUSED → run /4loops:week first (week-before-today)"
+    echo "       · /4loops:week THEN /4loops:today → see-then-pick; retry the gated edit → now ALLOWED"
+    echo "       · /nav → opens the priority-annotated board (★ focus · ! overdue · ⏳ due-soon), then"
+    echo "         just TALK: 'metrics endpoint is done, start the pricing copy, add rate limiting Fri'"
     echo "       · note ◆ on the modeling story (API-002) + the due dates on the cells"
     if [ "$INSTALL" = real ]; then
       echo "       · bump version → /plugin update → /reload-plugins → new hooks run (B4)"

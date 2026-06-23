@@ -188,7 +188,7 @@ vt_log_record_override() {
 }
 
 vt_record_deny_reason() {
-  printf '%s' "4loops: the board records (board.md / current-priorities.md) are rail-owned — hand-editing desyncs counts + transitions.log. Use the rails: capture with /4loops:arrange, then reconcile with /4loops:today, /4loops:week, or /4loops:priority (they move stories, set focus, and retire dead work for you). To hand-edit anyway (logged), re-run prefixed with VT_ALLOW_RECORD_WRITE=1."
+  printf '%s' "4loops: the board records (board.md / current-priorities.md) are rail-owned — hand-editing desyncs counts + transitions.log. Just talk to /4loops:nav (say what's new, what moved, what's done) and it moves the board for you; or run the rituals /4loops:today and /4loops:week. To hand-edit anyway (logged), re-run prefixed with VT_ALLOW_RECORD_WRITE=1."
 }
 
 # ── Override logging (the only escape — per-action, re-arms next call) ────────

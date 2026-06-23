@@ -11,7 +11,7 @@
       "name": "4loops",
       "source": "./plugin",
       "description": "Personal orientation layer: story-state kanban + daily/weekly priorities + surfaced drift, enforced by a SessionStart sentinel and a PreToolUse hard gate.",
-      "version": "2.1.0",
+      "version": "2.2.0",
       "author": {
         "name": "idnk2203"
       }
