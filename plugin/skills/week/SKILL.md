@@ -2,6 +2,7 @@
 name: week
 description: Weekly board reconciliation — print the board, then pick (structured) what's done, what to commit this week, what to drop; set 3–5 anchors. Leads with overdue / due-soon. Run FIRST on a new ISO week, before /today, so the week's context flows down to the day.
 allowed-tools: Bash, AskUserQuestion
+disable-model-invocation: true
 user-invocable: true
 ---
 

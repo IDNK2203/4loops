@@ -2,6 +2,7 @@
 name: configure
 description: First-run setup for 4loops — detect the projects you track, choose a week-start, confirm which projects the rail guards, then bootstrap your board by spawning this week's focus. Run this once, right after the plugin installs. The aha is the first reconciliation, not a feature tour.
 allowed-tools: Bash, AskUserQuestion, TodoWrite
+disable-model-invocation: true
 user-invocable: true
 ---
 

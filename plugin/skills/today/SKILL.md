@@ -2,6 +2,7 @@
 name: today
 description: Daily board reconciliation — print the board, then pick (structured) what moved: started / testing / done / park. New work and today's 1–3 focus fall out of it. Leads with overdue / due-soon. Writes the Today stamp, which lifts the focus gate for the day.
 allowed-tools: Bash, AskUserQuestion
+disable-model-invocation: true
 user-invocable: true
 ---
 
@@ -9,13 +10,18 @@ user-invocable: true
 
 ## Steps
 
-### 0. Require configuration
+### 0. Require configuration — and that the week ran first
 
 ```bash
 [ -f .4loops/config ] && echo CONFIGURED || echo UNCONFIGURED
+source "${CLAUDE_PLUGIN_ROOT}/scripts/vt-priorities-lib.sh"
+week_stamp_current "$(read_week_stamp)" && echo WEEK_OK || echo WEEK_STALE
 ```
 
-If `UNCONFIGURED`, stop and say: **"No 4loops board is configured here yet — run `/4loops:configure` first."**
+- `UNCONFIGURED` → stop: **"No 4loops board is configured here yet — run `/4loops:configure` first."**
+- `WEEK_STALE` → stop: **"It's a new week — run `/4loops:week` first; its anchors flow into today."**
+  This is a hard rule: on a fresh ISO week the weekly reconciliation comes before the daily one
+  (the rail enforces it too — `vt-today.sh` refuses to set focus until the week is current).
 
 ### 1. Orient — print the board ONCE (the context)
 

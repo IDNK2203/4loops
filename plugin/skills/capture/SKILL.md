@@ -1,15 +1,27 @@
 ---
-name: arrange
-description: User-invoked capture — brain-dump a batch of work in plain language and it drafts the stories onto the board (with type + deadline), riding the rails so the board never goes stale. You invoke it, so it captures from what you say; it never sets your priority. Run /today or /priority afterward to choose focus.
+name: capture
+description: Capture escape — brain-dump a batch of work in plain language and it drafts the stories onto the board (with type + deadline). A hidden power-user hatch; the normal way to capture is to just say it in /nav. It captures only — never sets priority, never moves state.
 allowed-tools: Bash, AskUserQuestion
 disable-model-invocation: true
 user-invocable: true
 argument-hint: "<describe the work you want to capture>"
 ---
 
-`/arrange` turns a brain-dump into board stories — no hand-typing rail commands. You describe a batch of work in plain language; I parse it into stories (with type + deadline) and draft them onto the board. **Invoking `/arrange` is your go** — I show you what I'm capturing, then create it. I don't reorganize or reprioritize; capture is all this does.
+`/capture` turns a brain-dump into board stories. It is a **thin escape** — the main path is to just
+say what's new in `/nav`, which captures as you talk. This exists for the case you want to dump a
+batch directly. You describe work in plain language; I parse it into stories (with type + deadline)
+and draft them onto the board. **Invoking `/capture` is your go** — I show what I'm capturing, then
+create it. I don't reorganize or reprioritize; capture is all this does.
 
-This skill is **user-invoked only** (`disable-model-invocation: true`) — the agent can never trigger it on its own.
+User-invoked only (`disable-model-invocation: true`) — the agent can never trigger it on its own.
+
+## Step 0 — Require configuration
+
+```bash
+[ -f .4loops/config ] && echo CONFIGURED || echo UNCONFIGURED
+```
+
+If `UNCONFIGURED`, stop: **"No 4loops board here yet — run `/4loops:configure` first."**
 
 ## Steps
 
@@ -33,7 +45,7 @@ For each discrete work item, infer:
 
 ### 3. Show + create (the command was your go)
 
-Preview the batch (creates nothing), then create it — no separate confirm gate, since invoking `/arrange` is the consent:
+Preview the batch (creates nothing), then create it — no separate confirm gate, since invoking `/capture` is the consent:
 
 ```bash
 # preview
@@ -47,7 +59,7 @@ Show the preview to the user as you create — if they immediately object, you'v
 
 ### 4. Hand priority back
 
-Every story lands in **Backlog**. Do **not** set focus — tell the user to run `/4loops:today` or `/4loops:priority add <id…>` to choose what to work on. Priority stays the operator's.
+Every story lands in **Backlog**. Do **not** set focus — tell the user to choose what to work on via `/nav` (or `/4loops:prioritize add <id…>`). Priority stays the operator's.
 
 ## Notes
 

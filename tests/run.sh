@@ -318,7 +318,8 @@ W11=$(mktemp -d); export VT_DIR="$W11/.4loops"
 source "$S/vt-priorities-lib.sh"
 P1=$(bash "$S/vt-draft.sh" T "first"  | grep -oE 'T-[0-9]+')
 P2=$(bash "$S/vt-draft.sh" T "second" | grep -oE 'T-[0-9]+')
-bash "$S/vt-today.sh" "$P1" >/dev/null
+# This suite tests priority mechanics, not the week-before-today rule → bypass the week guard.
+VT_ALLOW_TODAY_FIRST=1 bash "$S/vt-today.sh" "$P1" >/dev/null
 ck "priority: today focus starts as P1"           '[ "$(read_focus today)" = "'"$P1"'" ]'
 bash "$S/vt-priority.sh" add "$P2" >/dev/null
 ck "priority add: appends P2 to focus"            'printf "%s" "$(read_focus today)" | grep -q "'"$P2"'"'
@@ -383,7 +384,7 @@ ck "arrange: drafts the modeling story"        'grep -q "model the flow" "$VT_DI
 ck "arrange: preserves type=modeling"          'grep "model the flow" "$VT_DIR/board.md" | grep -q "type: modeling"'
 ck "arrange: applies deadline from TSV"        'grep "ship the thing" "$VT_DIR/board.md" | grep -q "due: 2026-07-15"'
 ck "arrange: both land in Backlog (2 rows)"    '[ "$(grep -cE "ship the thing|model the flow" "$VT_DIR/board.md")" -ge 2 ]'
-ck "arrange: skill is user-invoked only"       'grep -q "disable-model-invocation: true" "$PLUGIN/skills/arrange/SKILL.md"'
+ck "capture: skill is user-invoked only"       'grep -q "disable-model-invocation: true" "$PLUGIN/skills/capture/SKILL.md"'
 unset VT_DIR
 
 echo
@@ -438,8 +439,8 @@ ck "today: prints the board once"               'grep -qi "print the board ONCE"
 ck "today: surfaces overdue / due-soon"         'grep -qi "overdue" "$PLUGIN/skills/today/SKILL.md"'
 ck "week: wider lens, runs first"               'grep -qi "wider lens" "$PLUGIN/skills/week/SKILL.md"'
 ck "week: structured multi-select reconcile"    'grep -qi "structured multi-select" "$PLUGIN/skills/week/SKILL.md"'
-ck "priority: in-between cadence"               'grep -qi "in-between" "$PLUGIN/skills/priority/SKILL.md"'
-ck "arrange: user-invoked only (capture)"       'grep -q "disable-model-invocation: true" "$PLUGIN/skills/arrange/SKILL.md"'
+ck "prioritize: focus-only escape"              'grep -qi "focus-only" "$PLUGIN/skills/prioritize/SKILL.md"'
+ck "capture: user-invoked only"                 'grep -q "disable-model-invocation: true" "$PLUGIN/skills/capture/SKILL.md"'
 ck "configure: pin-the-board onboarding tip"    'grep -qi "pin" "$PLUGIN/skills/configure/SKILL.md"'
 
 echo
@@ -467,6 +468,53 @@ ck "dense: overdue flags the right active stories"      'printf "%s" "$OV18" | g
 ck "dense: overdue ignores far-future co-located"       '! printf "%s" "$OV18" | grep -q "P0-400"'
 ck "dense: overdue ignores no-due co-located"           '! printf "%s" "$OV18" | grep -q "P0-402"'
 ck "dense: overdue ignores DONE co-located"             '! printf "%s" "$OV18" | grep -q "P0-403"'
+unset VT_DIR
+
+echo
+echo "════ 19. v2.2 rules — config-first · week-before-today · user-only ════"
+# WEEK-BEFORE-TODAY (hard, rail-level): on a fresh ISO week /today refuses until /week ran.
+W19=$(mktemp -d); export VT_DIR="$W19/.4loops"; mkboard "$VT_DIR"; : > "$VT_DIR/transitions.log"; touch "$VT_DIR/config"
+Z1=$(bash "$S/vt-draft.sh" Z "thing" | grep -oE 'Z-[0-9]+')
+ck "week-first: vt-today REFUSES on a fresh week" '! bash "$S/vt-today.sh" "'"$Z1"'" 2>/dev/null'
+ck "week-first: VT_ALLOW_TODAY_FIRST bypass works" 'VT_ALLOW_TODAY_FIRST=1 bash "$S/vt-today.sh" "'"$Z1"'" >/dev/null 2>&1'
+unset VT_DIR
+W19b=$(mktemp -d); export VT_DIR="$W19b/.4loops"; mkboard "$VT_DIR"; : > "$VT_DIR/transitions.log"; touch "$VT_DIR/config"
+Z2=$(bash "$S/vt-draft.sh" Z "thing" | grep -oE 'Z-[0-9]+'); bash "$S/vt-week.sh" "$Z2" >/dev/null
+ck "week-first: vt-today SUCCEEDS after /week"    'bash "$S/vt-today.sh" "'"$Z2"'" >/dev/null 2>&1'
+unset VT_DIR
+# CONFIG-FIRST: every board command's skill checks for .4loops/config in step 0.
+ck "config-first: /today checks config"          'grep -q "\.4loops/config" "$PLUGIN/skills/today/SKILL.md"'
+ck "config-first: /week checks config"           'grep -q "\.4loops/config" "$PLUGIN/skills/week/SKILL.md"'
+ck "config-first: /nav checks config"            'grep -q "\.4loops/config" "$PLUGIN/skills/nav/SKILL.md"'
+ck "config-first: /capture checks config"        'grep -q "\.4loops/config" "$PLUGIN/skills/capture/SKILL.md"'
+ck "config-first: /prioritize checks config"     'grep -q "\.4loops/config" "$PLUGIN/skills/prioritize/SKILL.md"'
+ck "config-first: /manage checks config"         'grep -q "\.4loops/config" "$PLUGIN/skills/manage/SKILL.md"'
+# USER-ONLY: every board-mutating skill is disable-model-invocation; /board stays read-only-invocable.
+ck "user-only: /nav"                             'grep -q "disable-model-invocation: true" "$PLUGIN/skills/nav/SKILL.md"'
+ck "user-only: /capture"                         'grep -q "disable-model-invocation: true" "$PLUGIN/skills/capture/SKILL.md"'
+ck "user-only: /prioritize"                      'grep -q "disable-model-invocation: true" "$PLUGIN/skills/prioritize/SKILL.md"'
+ck "user-only: /manage"                          'grep -q "disable-model-invocation: true" "$PLUGIN/skills/manage/SKILL.md"'
+ck "user-only: /today"                           'grep -q "disable-model-invocation: true" "$PLUGIN/skills/today/SKILL.md"'
+ck "user-only: /week"                            'grep -q "disable-model-invocation: true" "$PLUGIN/skills/week/SKILL.md"'
+ck "user-only: /configure"                       'grep -q "disable-model-invocation: true" "$PLUGIN/skills/configure/SKILL.md"'
+ck "user-only: /board stays model-invocable"     '! grep -q "disable-model-invocation" "$PLUGIN/skills/board/SKILL.md"'
+
+echo
+echo "════ 20. /nav + priority-annotated render (v2.2) ════"
+ck "nav: operate-never-simulate contract"        'grep -qi "never simulate\|Re-render as proof" "$PLUGIN/skills/nav/SKILL.md"'
+ck "nav: opens on the annotated board"           'grep -q -- "--priorities" "$PLUGIN/skills/nav/SKILL.md"'
+W20=$(mktemp -d); export VT_DIR="$W20/.4loops"; mkboard "$VT_DIR"; : > "$VT_DIR/transitions.log"; touch "$VT_DIR/config"
+PAST20=$(date -v-3d +%F 2>/dev/null || date -d '3 days ago' +%F)
+SOON20=$(date -v+1d +%F 2>/dev/null || date -d '1 day' +%F)
+F1=$(bash "$S/vt-draft.sh" N "focus due soon" "" "" --deadline "$SOON20" | grep -oE 'N-[0-9]+')
+F2=$(bash "$S/vt-draft.sh" N "overdue thing"  "" "" --deadline "$PAST20" | grep -oE 'N-[0-9]+')
+bash "$S/vt-week.sh" "$F1" >/dev/null; bash "$S/vt-today.sh" "$F1" >/dev/null
+PRI20=$(bash "$S/vt-render.sh" --priorities)
+ck "priorities: ★ on the focused story"          'printf "%s" "$PRI20" | grep "'"$F1"'" | grep -q "★"'
+ck "priorities: ⏳ on the due-soon story"          'printf "%s" "$PRI20" | grep "'"$F1"'" | grep -q "⏳"'
+ck "priorities: ! on the overdue story"          'printf "%s" "$PRI20" | grep "'"$F2"'" | grep -q "!"'
+ck "priorities: no ★ on the non-focused story"   '! { printf "%s" "$PRI20" | grep "'"$F2"'" | grep -q "★"; }'
+ck "priorities: default render has no ★/⏳ overlay" '! bash "$S/vt-render.sh" | grep -qE "★|⏳"'
 unset VT_DIR
 
 echo "════ RESULT: $P passed, $F failed ════"
