@@ -42,6 +42,7 @@ USAGE
                                  (demo the B1 rail block on a live, reconciled board)
   sandbox.sh list                show all sandboxes
   sandbox.sh rm <name>           delete a sandbox
+  sandbox.sh prune               delete ALL sandboxes (clean up dead workspaces)
 
 MODES
   --isolated   (default) persistent ~/Ship/vt-sandbox/<name>, hermetic. True fresh-user env.
@@ -315,6 +316,17 @@ cmd_rm() {
   echo "✓ removed '$name' ($root)"
 }
 
+cmd_prune() {  # remove ALL sandboxes in both bases — the "clean up dead workspaces" reset.
+  local found=0 d
+  for d in "$PERSIST_BASE"/*/ "$TMP_BASE"/vt-sandbox-*/; do
+    [ -f "${d}.sandbox-meta" ] || continue   # only real sandboxes (marker present)
+    case "$d" in
+      "$PERSIST_BASE"/?*/|"$TMP_BASE"/vt-sandbox-?*/) found=1; rm -rf "$d" && echo "✓ removed $(basename "$d")" ;;
+    esac
+  done
+  [ "$found" = 0 ] && echo "  (no sandboxes to prune)"
+}
+
 # ── Dispatch ──────────────────────────────────────────────────────────────────
 case "${1:-}" in
   new)               shift; parse_new_args "$@"; cmd_new ;;
@@ -322,6 +334,7 @@ case "${1:-}" in
   expire)            shift; cmd_expire "${1:-}" ;;
   list)              cmd_list ;;
   rm)                shift; cmd_rm "${1:-}" ;;
+  prune)             cmd_prune ;;
   ""|-h|--help|help) usage ;;
-  *)                 die "unknown subcommand: $1 (try: new|refresh|list|rm)" ;;
+  *)                 die "unknown subcommand: $1 (try: new|refresh|list|rm|prune)" ;;
 esac

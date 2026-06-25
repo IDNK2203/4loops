@@ -16,10 +16,11 @@ Two tracks, each a complete arc:
 **The mock workspace** (both sandboxes): two real git repos — **web-app** + **api-service** (detected as
 Projects, gated), a **docs/** Area (untracked, free to edit), and **study/** (hard-exempt). A real Tuesday.
 
-```bash
-# the launch command both tracks use:
-PLUGIN="$(cd ~/Ship/bls/projects/p0-vibe-table/vibe-table/plugin && pwd)"
-```
+> **Did the plugin load? (read this first.)** The launch command points `--plugin-dir` at the plugin
+> folder *inline* — don't rely on a shell variable (an empty one silently loads nothing). After launch,
+> type `/4loops` — you should see the menu: **`/4loops:today` · `:week` · `:nav` · `:board` · `:configure`**.
+> Commands are namespaced — it's `/4loops:today`, **not** `/today`. If the menu is empty, the plugin
+> didn't load: check the `--plugin-dir` path resolves and re-run.
 
 ---
 
@@ -29,7 +30,7 @@ A brand-new, empty workspace. This arc shows the **full gate lifecycle**: reconc
 stale = you're blocked until you reconcile.
 
 ```bash
-cd /tmp/vt-sandbox-beta-fresh/workspace && claude --plugin-dir "$PLUGIN"
+cd /tmp/vt-sandbox-beta-fresh/workspace && claude --plugin-dir ~/Ship/bls/projects/p0-vibe-table/vibe-table/plugin
 ```
 
 **1. It's silent.** No board, no nagging — and nothing works yet: every command requires `/configure`
@@ -65,7 +66,7 @@ bash ~/Ship/bls/projects/p0-vibe-table/vibe-table/sandbox/sandbox.sh expire beta
 ```
 Reopen a **fresh session**:
 ```bash
-cd /tmp/vt-sandbox-beta-fresh/workspace && claude --plugin-dir "$PLUGIN"
+cd /tmp/vt-sandbox-beta-fresh/workspace && claude --plugin-dir ~/Ship/bls/projects/p0-vibe-table/vibe-table/plugin
 ```
 
 **7. The gate blocks you (the thesis).** The sentinel renders the board and flags stale focus. Ask Claude
@@ -93,7 +94,7 @@ soon), a ◆ modeling story — but **no focus set, on a fresh ISO week**. You'r
 (Think: starting the week on a board that's already full — so the week ritual comes first.)
 
 ```bash
-cd /tmp/vt-sandbox-beta-day5/workspace && claude --plugin-dir "$PLUGIN"
+cd /tmp/vt-sandbox-beta-day5/workspace && claude --plugin-dir ~/Ship/bls/projects/p0-vibe-table/vibe-table/plugin
 ```
 
 **1. The board renders itself.** SessionStart sentinel prints the dashboard; **drift leads with overdue /
@@ -164,7 +165,11 @@ bash "$S" expire  beta-fresh    # backdate Today's focus → next session's gate
 bash "$S" list                  # show sandboxes
 bash "$S" new --light --empty beta-fresh   # recreate the onboarding sandbox if you trashed it
 bash "$S" rm beta-fresh         # delete one
+bash "$S" prune                 # delete ALL sandboxes (clean up dead workspaces)
 ```
+
+> These `--light` sandboxes live under `/tmp`, so they're disposable by nature — macOS clears `/tmp` on
+> reboot. `prune` is just the on-demand version; nothing here touches your real workspace.
 
 Anything that feels off → note the step + what actually happened; it rides a fix commit on
 `feat/v2-spine` (that's how the dense-grid drift bug got caught — in this exact harness).
