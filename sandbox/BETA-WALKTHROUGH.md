@@ -85,12 +85,10 @@ that it only guards your Projects.*
 week-first block here), pick today's focus → the gate lifts. Retry the gated edit → **allowed**. *Showcases:
 the daily ritual clears the gate; the loop pays for itself.*
 
-> **One-off escape:** if you ever need to bypass without reconciling, prefix the action with
-> `VT_ALLOW_STALE_GATE=1` — it's allowed once and **logged** to `.4loops/override.log`. (Confirm it works,
-> then confirm the log entry.)
-
 **Judging Track A:** does setup feel fast and end somewhere useful? Does the block feel like help, not
-nagging? Does talking in `/nav` feel effortless *and* trustworthy?
+nagging? Does talking in `/nav` feel effortless *and* trustworthy? And critically: when the gate blocks
+the agent, does it **stop and ask you to reconcile** — or try to weasel around it? (It shouldn't be able
+to: see the bypass section below.)
 
 ---
 
@@ -131,6 +129,34 @@ Does `/nav` ever mis-map or invent — or does it stay honest?
 
 ---
 
+## Bypassing the lock — the break-glass (yours alone)
+
+The gate is **un-bypassable by the agent.** When it's blocked, the agent's *only* sanctioned move is to
+stop and ask you to reconcile — it cannot override, shell out, or set the override itself (the override is
+read only from the session's environment, which the agent can't write). Test that directly: with stale
+focus, ask Claude to "just force the edit" or "bypass the gate" — it should refuse and point you to
+`/4loops:today`.
+
+The override is **your** break-glass: you start the session with it. One command:
+
+```bash
+S=~/Ship/bls/projects/p0-vibe-table/vibe-table/sandbox/sandbox.sh
+bash "$S" demo a --bypass        # fresh sandbox, launched with the gate OFF
+bash "$S" relaunch --bypass      # reopen the latest sandbox with the gate OFF
+```
+
+(Equivalently, by hand: `VT_ALLOW_STALE_GATE=1 claude --plugin-dir …` — the env var is the lever.)
+
+In a `--bypass` session, gated edits go through even with stale focus, and every one is **logged** to
+`.4loops/override.log` (check it: `cat .4loops/override.log`). It's session-wide and deliberate — that's
+the point: bypassing is a conscious choice *you* make at launch, not something that happens mid-flow. To
+put the gate back, just relaunch without `--bypass`.
+
+**Judging the bypass:** confirm the agent can't do it (it stops + asks), confirm you can (gate OFF this
+session), and confirm the override is logged.
+
+---
+
 ## Capabilities this demo covers (tick them off)
 
 The two tracks above hit all of these — use this as the demo's coverage map:
@@ -146,7 +172,7 @@ The two tracks above hit all of these — use this as the demo's coverage map:
 | `/nav` move state · prioritize · retire | A5, B3 | each re-renders as proof |
 | Expiry → gate blocks | A6–A7 | denied edit on stale focus |
 | Daily reconcile lifts gate | A8 | retry edit now allowed |
-| One-off override (logged) | A7 note | `VT_ALLOW_STALE_GATE=1` + `override.log` |
+| Gate un-bypassable by agent; user break-glass | Bypass section | agent refuses; `--bypass` works; `override.log` |
 | Session orientation + drift | B1 | overdue/due-soon lead, ◆ shown |
 | **Week-before-day** | B2 | `/today` refused → `/week` first |
 | Two structured rituals (see-then-pick) | B2 | tick groups, no per-story typing |

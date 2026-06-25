@@ -188,7 +188,7 @@ vt_log_record_override() {
 }
 
 vt_record_deny_reason() {
-  printf '%s' "4loops: the board records (board.md / current-priorities.md) are rail-owned — hand-editing desyncs counts + transitions.log. Just talk to /4loops:nav (say what's new, what moved, what's done) and it moves the board for you; or run the rituals /4loops:today and /4loops:week. To hand-edit anyway (logged), re-run prefixed with VT_ALLOW_RECORD_WRITE=1."
+  printf '%s' "4loops: the board records (board.md / current-priorities.md) are rail-owned — hand-editing desyncs counts + transitions.log. Do NOT hand-edit them yourself. Just talk to /4loops:nav (say what's new, what moved, what's done) and it moves the board for you; or run the rituals /4loops:today and /4loops:week. Hand-editing is the USER's decision alone — only if THEY explicitly ask (it's logged)."
 }
 
 # ── Override logging (the only escape — per-action, re-arms next call) ────────
@@ -209,7 +209,7 @@ vt_gate_directive() {
   else
     lead="Today's focus is stale — run /4loops:today to reconcile the board and set today's focus."
   fi
-  printf '%s' "4loops gate (focus stale). ${lead} That reconciliation IS your priority-setting and it lifts this gate. Reading, search, and notes (.4loops/, study/, learnings/, inbox/) are never blocked. One-time bypass for THIS single action (logged): re-run prefixed with VT_ALLOW_STALE_GATE=1."
+  printf '%s' "4loops gate (focus stale). ${lead} STOP here — do NOT edit this gated surface, and do NOT work around the gate yourself (no override, no shelling out, no alternate tool). You cannot reconcile for the user: the rituals are user-invoked by design. Surface this, ask them to run the command above, and wait — that reconciliation IS their priority-setting and it lifts the gate. Reading, search, and notes (.4loops/, study/, learnings/, inbox/) are never blocked, so do whatever non-gated work you can meanwhile. Bypassing is the USER's decision alone — only if THEY explicitly tell you to (it's logged)."
 }
 
 # Emit a PreToolUse deny. Canonical = exit 0 + hookSpecificOutput JSON; falls

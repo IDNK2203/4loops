@@ -350,7 +350,8 @@ bg12(){ local o r; o=$(printf '%s' "$1" | bash "$H/vt-bash-gate.sh" 2>&1); r=$?;
 ck "record: sed -i board.md blocked (bash)"    'bg12 "$(bj12 RZ "sed -i s/x/y/ .4loops/board.md")"'
 ck "record: echo >> board.md blocked (bash)"   'bg12 "$(bj12 RZ "echo x >> .4loops/board.md")"'
 ck "record: cat board.md (read) allowed"       '! bg12 "$(bj12 RZ "cat .4loops/board.md")"'
-ck "record: bash override allows board write"  '! bg12 "$(bj12 RZ "VT_ALLOW_RECORD_WRITE=1 echo x >> .4loops/board.md")"'
+ck "record: bash INLINE override IGNORED (blocked)" 'bg12 "$(bj12 RZ "VT_ALLOW_RECORD_WRITE=1 echo x >> .4loops/board.md")"'
+ck "record: bash ENV override allowed"         '! { printf "%s" "$(bj12 RZ "echo x >> .4loops/board.md")" | VT_ALLOW_RECORD_WRITE=1 bash "$H/vt-bash-gate.sh" 2>&1 | grep -q "\"deny\""; }'
 unset VT_DIR 2>/dev/null || true
 
 echo
@@ -498,6 +499,11 @@ ck "user-only: /today"                           'grep -q "disable-model-invocat
 ck "user-only: /week"                            'grep -q "disable-model-invocation: true" "$PLUGIN/skills/week/SKILL.md"'
 ck "user-only: /configure"                       'grep -q "disable-model-invocation: true" "$PLUGIN/skills/configure/SKILL.md"'
 ck "user-only: /board stays model-invocable"     '! grep -q "disable-model-invocation" "$PLUGIN/skills/board/SKILL.md"'
+# GATE MESSAGES must not teach the AGENT to self-bypass (it should stop + have the user reconcile).
+ck "gate msg: agent told not to work around"     'grep -q "do NOT work around the gate yourself" "$S/vt-guard-lib.sh"'
+ck "gate msg: bypass is the USER's decision"     'grep -q "Bypassing is the USER" "$S/vt-guard-lib.sh"'
+ck "gate msg: no agent-actionable bypass hint"   '! grep -q "re-run prefixed with VT_ALLOW" "$S/vt-guard-lib.sh"'
+ck "record msg: agent told not to hand-edit"     'grep -q "Do NOT hand-edit them yourself" "$S/vt-guard-lib.sh"'
 
 echo
 echo "════ 20. /nav + priority-annotated render (v2.2) ════"
@@ -515,6 +521,24 @@ ck "priorities: ⏳ on the due-soon story"          'printf "%s" "$PRI20" | grep
 ck "priorities: ! on the overdue story"          'printf "%s" "$PRI20" | grep "'"$F2"'" | grep -q "!"'
 ck "priorities: no ★ on the non-focused story"   '! { printf "%s" "$PRI20" | grep "'"$F2"'" | grep -q "★"; }'
 ck "priorities: default render has no ★/⏳ overlay" '! bash "$S/vt-render.sh" | grep -qE "★|⏳"'
+unset VT_DIR
+
+echo
+echo "════ 21. Gate is un-bypassable by the agent (env-only override) ════"
+GATE="$PLUGIN/hooks/vt-bash-gate.sh"
+W21=$(mktemp -d); export VT_DIR="$W21/.4loops"; mkdir -p "$W21/projects/demo/content"
+bash "$S/vt-config.sh" week-start mon >/dev/null
+bash "$S/vt-config.sh" gated "projects/demo/content/*" >/dev/null
+GID=$(bash "$S/vt-draft.sh" D "task" | grep -oE 'D-[0-9]+')
+bash "$S/vt-week.sh" "$GID" >/dev/null; bash "$S/vt-today.sh" "$GID" >/dev/null
+gy=$(date -v-1d +%F 2>/dev/null || date -d yesterday +%F)   # backdate Today → gate ACTIVE
+sed -i.bak -E "s/## Today \([0-9-]+\)/## Today ($gy)/" "$VT_DIR/current-priorities.md"; rm -f "$VT_DIR/current-priorities.md.bak"
+: > "$VT_DIR/.armed"
+gjson() { printf '{"tool_input":{"command":"%s"},"cwd":"%s","session_id":"s1"}' "$1" "$W21"; }
+ck "gate: AGENT inline override is IGNORED (blocked)"  'gjson "VT_ALLOW_STALE_GATE=1 echo x > projects/demo/content/post.md" | bash "$GATE" 2>&1 | grep -q deny'
+ck "gate: plain gated write is blocked"                'gjson "echo x > projects/demo/content/post.md" | bash "$GATE" 2>&1 | grep -q deny'
+ck "gate: USER env override is honored (allowed)"      '! { gjson "echo x > projects/demo/content/post.md" | VT_ALLOW_STALE_GATE=1 bash "$GATE" 2>&1 | grep -q deny; }'
+ck "gate: bash-gate no longer parses override from cmd" '! grep -q "cmd.*in.*VT_ALLOW_STALE_GATE=1" "$PLUGIN/hooks/vt-bash-gate.sh"'
 unset VT_DIR
 
 echo "════ RESULT: $P passed, $F failed ════"

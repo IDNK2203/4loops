@@ -22,15 +22,18 @@ cmd=$(vt_json_field "$input" '.tool_input.command')
 sid=$(vt_json_field "$input" '.session_id')
 cwd=$(vt_json_field "$input" '.cwd')
 
-# Inline `VAR=1 cmd` prefixes never reach the hook's env — grep the command too.
+# Overrides are honored ONLY from the hook's inherited environment — i.e. the USER's
+# shell at launch (`VT_ALLOW_STALE_GATE=1 claude …`). We deliberately do NOT parse them
+# from the command string: an inline `VAR=1 cmd` prefix is something the AGENT can write,
+# and the gate must be un-bypassable by the agent. The agent's only sanctioned path when
+# blocked is to STOP and have the user reconcile (/4loops:today); the env override is the
+# user's break-glass alone.
 override=0
 [ "${VT_ALLOW_STALE_GATE:-}" = "1" ] && override=1
-case "$cmd" in *VT_ALLOW_STALE_GATE=1*) override=1 ;; esac
 
-# W4 record-write override (distinct from the staleness override).
+# W4 record-write override (distinct from the staleness override) — env-only, same reason.
 rec_override=0
 [ "${VT_ALLOW_RECORD_WRITE:-}" = "1" ] && rec_override=1
-case "$cmd" in *VT_ALLOW_RECORD_WRITE=1*) rec_override=1 ;; esac
 
 # Extract candidate write targets: > / >> redirects, tee [-a] files, sed -i.
 extract_targets() {

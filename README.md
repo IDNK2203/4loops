@@ -32,12 +32,12 @@ Stories carry **type** (`dev` / `modeling`) and an optional **deadline** — the
 - **Operate, never simulate.** Inside `/nav`, every change runs a real rail and **re-renders the board from disk as proof** — and the gate physically blocks hand-editing the board files, so a move can't be faked. If the board didn't change, it didn't happen.
 - **Config first.** Every command requires `/4loops:configure` to have run — a fresh install does nothing until you set it up.
 - **Week before day.** On a new ISO week, `/4loops:week` must run before `/4loops:today` — the weekly anchors flow into the day. `/today` refuses until the week is reconciled.
-- **The board can't be hand-edited.** `board.md` / `current-priorities.md` are rail-owned; direct edits are blocked (override `VT_ALLOW_RECORD_WRITE=1`).
+- **The board can't be hand-edited.** `board.md` / `current-priorities.md` are rail-owned; direct edits are blocked. Like the gate, the override (`VT_ALLOW_RECORD_WRITE=1`) is env-only — the agent can't set it; it edits only through the rails.
 
 ## How it enforces
 
 - **SessionStart sentinel** — renders the board dashboard, surfaces drift, and auto-runs the weekly rollover (Done → `archive/<month>/closed.md`).
-- **PreToolUse hard gate** — focus-staleness blocks writes to gated product surfaces until the daily/weekly reconciliation runs. Per-session clearance carries across midnight; a single-action override (`VT_ALLOW_STALE_GATE=1`) is logged for escapes.
+- **PreToolUse hard gate** — focus-staleness blocks writes to gated product surfaces until the daily/weekly reconciliation runs. Per-session clearance carries across midnight. The gate is **un-bypassable by the agent**: the override is read only from the session's environment (launch with `VT_ALLOW_STALE_GATE=1`), which the agent can't set — its only path when blocked is to stop and have you reconcile. Every override is logged to `override.log`.
 - **Bash writes too** — a path-only Edit/Write gate is bypassable by shelling out, so the gate also re-derives write targets from Bash commands (`>`, `>>`, `tee`, `sed -i`, `rm`, `mv`, `cp`, `touch`, `ln`, `mkdir`) — honoring a leading `cd <dir> &&` so relative targets resolve right — and applies the identical check. Residual blind spots (fail-open): glob/quoted args, mid-command `cd` chains, and arbitrary-code writers (`python -c`, `node -e`). Recommended: set `CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR=1` so relative paths resolve against the workspace root.
 - **Project-scoped by default** — each tracked project is gated as a *whole* (everything inside it, source included); Areas — notes, research, docs — always flow. `/4loops:configure` proposes the gated set (your projects) and lets you trim or add (see [Configuration](#configuration)).
 

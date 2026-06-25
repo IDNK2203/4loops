@@ -36,11 +36,13 @@ usage() {
 sandbox.sh — clean-room workspaces for dogfooding 4loops
 
 USAGE
-  sandbox.sh demo <a|b> [--no-launch]   ONE-SHOT: build a fresh, uniquely-named sandbox
-                                 for Track A (a, empty) or Track B (b, seeded) and launch
+  sandbox.sh demo <a|b> [--no-launch] [--bypass]   ONE-SHOT: build a fresh, uniquely-named
+                                 sandbox for Track A (a, empty) or Track B (b, seeded) and launch
                                  Claude in it. No prior workspace needed — run any time.
+                                 --bypass launches with VT_ALLOW_STALE_GATE=1 (gate OFF, user-only).
   sandbox.sh new [--light|--isolated] [--real-install] [--empty|--seeded] [name]
-  sandbox.sh relaunch [name]     reopen a sandbox in a fresh Claude session (default: latest)
+  sandbox.sh relaunch [name] [--bypass]   reopen a sandbox in a fresh Claude session (default:
+                                 latest). --bypass = VT_ALLOW_STALE_GATE=1 in the env (gate OFF).
   sandbox.sh refresh <name>      reset the board to seed (keeps the workspace)
   sandbox.sh expire [name]       backdate Today's focus → flips the gate ACTIVE (default: latest)
                                  (demo the B1 rail block on a live, reconciled board)
@@ -285,10 +287,10 @@ cmd_new() {
 #   sandbox.sh demo b   → Track B (seeded mid-week, fresh ISO week)
 #   sandbox.sh demo <a|b> --no-launch   → just build + print the launch command
 cmd_demo() {
-  local track="${1:-}" launch=1 ts seed root ws
+  local track="${1:-}" launch=1 bypass=0 ts seed root ws
   shift || true
   while [ $# -gt 0 ]; do
-    case "$1" in --no-launch) launch=0 ;; -*) die "unknown flag: $1" ;; *) die "unexpected arg: $1" ;; esac
+    case "$1" in --no-launch) launch=0 ;; --bypass) bypass=1 ;; -*) die "unknown flag: $1" ;; *) die "unexpected arg: $1" ;; esac
     shift
   done
   case "$track" in
@@ -306,6 +308,10 @@ cmd_demo() {
   write_meta "$root"
   echo "✓ fresh sandbox '$NAME'  ($root)" >&2
   if [ "$launch" = 1 ]; then
+    if [ "$bypass" = 1 ]; then
+      echo "  launching in BYPASS mode (VT_ALLOW_STALE_GATE=1) — the gate is OFF this whole session…" >&2
+      cd "$ws" && exec env VT_ALLOW_STALE_GATE=1 claude --plugin-dir "$PLUGIN_DIR"
+    fi
     echo "  launching Claude Code with the 4loops plugin — type /4loops to see the menu…" >&2
     cd "$ws" && exec claude --plugin-dir "$PLUGIN_DIR"
   fi
@@ -342,10 +348,18 @@ cmd_expire() {  # backdate Today's stamp so a reconciled board reads stale → g
 }
 
 cmd_relaunch() {  # reopen a sandbox in a FRESH Claude session (defaults to the latest one)
-  local name="${1:-}" root ws
+  local name="" bypass=0 root ws    # --bypass = launch with VT_ALLOW_STALE_GATE=1 in the env
+  while [ $# -gt 0 ]; do
+    case "$1" in --bypass) bypass=1 ;; -*) die "unknown flag: $1" ;; *) name="$1" ;; esac
+    shift
+  done
   if [ -n "$name" ]; then root="$(find_sandbox "$name")" || die "no sandbox '$name'"
   else root="$(latest_sandbox)" || die "no sandboxes yet — run: sandbox demo a"; fi
   ws="$root/workspace"
+  if [ "$bypass" = 1 ]; then
+    echo "↻ relaunching $(basename "$root") in BYPASS mode (VT_ALLOW_STALE_GATE=1) — gate OFF this session…" >&2
+    cd "$ws" && exec env VT_ALLOW_STALE_GATE=1 claude --plugin-dir "$PLUGIN_DIR"
+  fi
   echo "↻ relaunching $(basename "$root") — type /4loops for the menu…" >&2
   cd "$ws" && exec claude --plugin-dir "$PLUGIN_DIR"
 }
@@ -389,7 +403,7 @@ cmd_prune() {  # remove ALL sandboxes in both bases — the "clean up dead works
 # ── Dispatch ──────────────────────────────────────────────────────────────────
 case "${1:-}" in
   demo)              shift; cmd_demo "$@" ;;
-  relaunch|open)     shift; cmd_relaunch "${1:-}" ;;
+  relaunch|open)     shift; cmd_relaunch "$@" ;;
   new)               shift; parse_new_args "$@"; cmd_new ;;
   refresh)           shift; cmd_refresh "${1:-}" ;;
   expire)            shift; cmd_expire "${1:-}" ;;
