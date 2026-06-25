@@ -16,11 +16,20 @@ Two tracks, each a complete arc:
 **The mock workspace** (both sandboxes): two real git repos — **web-app** + **api-service** (detected as
 Projects, gated), a **docs/** Area (untracked, free to edit), and **study/** (hard-exempt). A real Tuesday.
 
-> **Did the plugin load? (read this first.)** The launch command points `--plugin-dir` at the plugin
-> folder *inline* — don't rely on a shell variable (an empty one silently loads nothing). After launch,
-> type `/4loops` — you should see the menu: **`/4loops:today` · `:week` · `:nav` · `:board` · `:configure`**.
-> Commands are namespaced — it's `/4loops:today`, **not** `/today`. If the menu is empty, the plugin
-> didn't load: check the `--plugin-dir` path resolves and re-run.
+**Launch with one command — no setup, no prior workspace needed.** `demo` builds a *fresh,
+uniquely-named* sandbox and drops you straight into a Claude session with the plugin loaded:
+
+```bash
+bash ~/Ship/bls/projects/p0-vibe-table/vibe-table/sandbox/sandbox.sh demo a   # Track A (onboarding)
+bash ~/Ship/bls/projects/p0-vibe-table/vibe-table/sandbox/sandbox.sh demo b   # Track B (mid-week)
+```
+
+Run it any time — even right after `prune`. Each run is a brand-new workspace (timestamped), so you
+never depend on a previous one.
+
+> **Did the plugin load?** Once in the session, type `/4loops` — you should see the menu:
+> **`/4loops:configure` · `:week` · `:today` · `:nav` · `:board`**. Commands are namespaced — it's
+> `/4loops:today`, **not** `/today`. If the menu is empty, the plugin didn't load (re-run `demo`).
 
 ---
 
@@ -30,7 +39,7 @@ A brand-new, empty workspace. This arc shows the **full gate lifecycle**: reconc
 stale = you're blocked until you reconcile.
 
 ```bash
-cd /tmp/vt-sandbox-beta-fresh/workspace && claude --plugin-dir ~/Ship/bls/projects/p0-vibe-table/vibe-table/plugin
+bash ~/Ship/bls/projects/p0-vibe-table/vibe-table/sandbox/sandbox.sh demo a
 ```
 
 **1. It's silent.** No board, no nagging — and nothing works yet: every command requires `/configure`
@@ -59,15 +68,13 @@ then speak as the day unfolds:
 Each runs on the rails and re-renders as proof. *Showcases: `/nav` capture + move + prioritize + retire,
 type/deadline inference, operate-never-simulate.*
 
-**6. End of day → next morning (simulate expiry).** Quit the session. Backdate today's focus so tomorrow
-it reads stale — the gate goes live:
+**6. End of day → next morning (simulate expiry).** Quit the session (Ctrl-D). Then in your shell:
 ```bash
-bash ~/Ship/bls/projects/p0-vibe-table/vibe-table/sandbox/sandbox.sh expire beta-fresh
+S=~/Ship/bls/projects/p0-vibe-table/vibe-table/sandbox/sandbox.sh
+bash "$S" expire      # backdate today's focus on the sandbox you just used → the gate goes live
+bash "$S" relaunch    # reopen that same sandbox in a FRESH session
 ```
-Reopen a **fresh session**:
-```bash
-cd /tmp/vt-sandbox-beta-fresh/workspace && claude --plugin-dir ~/Ship/bls/projects/p0-vibe-table/vibe-table/plugin
-```
+(Both default to the latest sandbox — no name to track.)
 
 **7. The gate blocks you (the thesis).** The sentinel renders the board and flags stale focus. Ask Claude
 to edit `web-app/src/components/Dashboard.jsx` → **DENIED** — today's focus is stale, reconcile first.
@@ -94,7 +101,7 @@ soon), a ◆ modeling story — but **no focus set, on a fresh ISO week**. You'r
 (Think: starting the week on a board that's already full — so the week ritual comes first.)
 
 ```bash
-cd /tmp/vt-sandbox-beta-day5/workspace && claude --plugin-dir ~/Ship/bls/projects/p0-vibe-table/vibe-table/plugin
+bash ~/Ship/bls/projects/p0-vibe-table/vibe-table/sandbox/sandbox.sh demo b
 ```
 
 **1. The board renders itself.** SessionStart sentinel prints the dashboard; **drift leads with overdue /
@@ -160,16 +167,17 @@ the first session of a new ISO week (the sentinel does it once, idempotently).
 
 ```bash
 S=~/Ship/bls/projects/p0-vibe-table/vibe-table/sandbox/sandbox.sh
-bash "$S" refresh beta-day5     # board back to seed (keeps the workspace)
-bash "$S" expire  beta-fresh    # backdate Today's focus → next session's gate is ACTIVE (re-demo the block)
-bash "$S" list                  # show sandboxes
-bash "$S" new --light --empty beta-fresh   # recreate the onboarding sandbox if you trashed it
-bash "$S" rm beta-fresh         # delete one
-bash "$S" prune                 # delete ALL sandboxes (clean up dead workspaces)
+bash "$S" demo a        # fresh Track A sandbox + launch (no prior workspace needed)
+bash "$S" demo b        # fresh Track B sandbox + launch
+bash "$S" relaunch      # reopen the latest sandbox in a fresh session
+bash "$S" expire        # backdate latest sandbox's Today focus → gate goes ACTIVE
+bash "$S" list          # show sandboxes
+bash "$S" prune         # delete ALL sandboxes (clean up dead workspaces)
 ```
 
-> These `--light` sandboxes live under `/tmp`, so they're disposable by nature — macOS clears `/tmp` on
-> reboot. `prune` is just the on-demand version; nothing here touches your real workspace.
+> `demo` builds a brand-new, timestamped sandbox every run, so you never depend on a previous one. The
+> `--light` sandboxes live under `/tmp` (macOS clears it on reboot); `prune` is the on-demand cleanup.
+> Nothing here touches your real workspace.
 
 Anything that feels off → note the step + what actually happened; it rides a fix commit on
 `feat/v2-spine` (that's how the dense-grid drift bug got caught — in this exact harness).

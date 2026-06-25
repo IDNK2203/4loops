@@ -36,9 +36,13 @@ usage() {
 sandbox.sh — clean-room workspaces for dogfooding 4loops
 
 USAGE
+  sandbox.sh demo <a|b> [--no-launch]   ONE-SHOT: build a fresh, uniquely-named sandbox
+                                 for Track A (a, empty) or Track B (b, seeded) and launch
+                                 Claude in it. No prior workspace needed — run any time.
   sandbox.sh new [--light|--isolated] [--real-install] [--empty|--seeded] [name]
+  sandbox.sh relaunch [name]     reopen a sandbox in a fresh Claude session (default: latest)
   sandbox.sh refresh <name>      reset the board to seed (keeps the workspace)
-  sandbox.sh expire <name>       backdate Today's focus → flips the gate ACTIVE
+  sandbox.sh expire [name]       backdate Today's focus → flips the gate ACTIVE (default: latest)
                                  (demo the B1 rail block on a live, reconciled board)
   sandbox.sh list                show all sandboxes
   sandbox.sh rm <name>           delete a sandbox
@@ -71,6 +75,19 @@ find_sandbox() {  # <name> → echo root, or return 1. Require the .sandbox-meta
                   # real-install can't shadow the real sandbox at the other location.
   [ -f "$PERSIST_BASE/$1/.sandbox-meta" ]        && { printf '%s' "$PERSIST_BASE/$1"; return 0; }
   [ -f "$TMP_BASE/vt-sandbox-$1/.sandbox-meta" ] && { printf '%s' "$TMP_BASE/vt-sandbox-$1"; return 0; }
+  return 1
+}
+
+# Echo the root of the most-recently-created sandbox (by marker mtime), or return 1.
+# Lets `expire` / `relaunch` default to "the one you just used" — no name to remember.
+latest_sandbox() {
+  local d t best=0 newest=""
+  for d in "$PERSIST_BASE"/*/ "$TMP_BASE"/vt-sandbox-*/; do
+    [ -f "${d}.sandbox-meta" ] || continue
+    t=$(stat -f %m "${d}.sandbox-meta" 2>/dev/null || stat -c %Y "${d}.sandbox-meta" 2>/dev/null || echo 0)
+    [ "$t" -gt "$best" ] && { best="$t"; newest="${d%/}"; }
+  done
+  [ -n "$newest" ] && { printf '%s' "$newest"; return 0; }
   return 1
 }
 
@@ -262,6 +279,39 @@ cmd_new() {
   print_launch "$root" "$ws"
 }
 
+# One-shot: build a FRESH, uniquely-named sandbox for a track and launch Claude in it.
+# No dependency on any prior workspace — run it any time, even right after `prune`.
+#   sandbox.sh demo a   → Track A (empty: install → /configure → …)
+#   sandbox.sh demo b   → Track B (seeded mid-week, fresh ISO week)
+#   sandbox.sh demo <a|b> --no-launch   → just build + print the launch command
+cmd_demo() {
+  local track="${1:-}" launch=1 ts seed root ws
+  shift || true
+  while [ $# -gt 0 ]; do
+    case "$1" in --no-launch) launch=0 ;; -*) die "unknown flag: $1" ;; *) die "unexpected arg: $1" ;; esac
+    shift
+  done
+  case "$track" in
+    a|A|fresh|empty)    EMPTY=true;  seed=fresh ;;
+    b|B|seeded|midweek) EMPTY=false; seed=midweek ;;
+    *) die "usage: sandbox demo <a|b> [--no-launch]  (a = Track A empty/onboarding, b = Track B seeded)" ;;
+  esac
+  MODE=light; INSTALL=""
+  ts=$(date +%Y%m%d-%H%M%S)
+  NAME="beta-${seed}-${ts}"
+  root="$(sandbox_root light "$NAME")"; ws="$root/workspace"
+  mkdir -p "$ws"
+  scaffold_mock "$ws"
+  [ "$EMPTY" = false ] && seed_board "$ws/.4loops"
+  write_meta "$root"
+  echo "✓ fresh sandbox '$NAME'  ($root)" >&2
+  if [ "$launch" = 1 ]; then
+    echo "  launching Claude Code with the 4loops plugin — type /4loops to see the menu…" >&2
+    cd "$ws" && exec claude --plugin-dir "$PLUGIN_DIR"
+  fi
+  echo "  launch:  cd \"$ws\" && claude --plugin-dir \"$PLUGIN_DIR\"" >&2
+}
+
 cmd_refresh() {
   local name="${1:-}" root ws
   [ -z "$name" ] && die "usage: sandbox refresh <name>"
@@ -276,8 +326,9 @@ cmd_refresh() {
 
 cmd_expire() {  # backdate Today's stamp so a reconciled board reads stale → gate active
   local name="${1:-}" root vt pri y
-  [ -z "$name" ] && die "usage: sandbox expire <name>"
-  root="$(find_sandbox "$name")" || die "no sandbox '$name'"
+  if [ -n "$name" ]; then root="$(find_sandbox "$name")" || die "no sandbox '$name'"
+  else root="$(latest_sandbox)" || die "no sandboxes yet — run: sandbox demo a"; fi
+  name="$(basename "$root")"; name="${name#vt-sandbox-}"
   vt="$root/workspace/.4loops"
   pri="$vt/current-priorities.md"
   [ -f "$pri" ] || die "no current-priorities.md in '$name' — run /4loops:configure (or /4loops:today) first"
@@ -287,8 +338,16 @@ cmd_expire() {  # backdate Today's stamp so a reconciled board reads stale → g
   sed -i.bak -E "s/## Today \([0-9-]+\)/## Today ($y)/" "$pri" && rm -f "$pri.bak"
   : > "$vt/.armed"   # the gate only enforces once armed
   echo "✓ expired '$name' — Today backdated to $y; the rail is now ACTIVE for any NEW session."
-  echo "  Demo: start a FRESH session (the /configure session stays cleared by design) →"
-  echo "  attempt an Edit to a gated path → BLOCKED (B1); run /4loops:today → retry → ALLOWED (B2)."
+  echo "  Now reopen it fresh:  sandbox relaunch    (then attempt a gated Edit → BLOCKED; /4loops:today → ALLOWED)"
+}
+
+cmd_relaunch() {  # reopen a sandbox in a FRESH Claude session (defaults to the latest one)
+  local name="${1:-}" root ws
+  if [ -n "$name" ]; then root="$(find_sandbox "$name")" || die "no sandbox '$name'"
+  else root="$(latest_sandbox)" || die "no sandboxes yet — run: sandbox demo a"; fi
+  ws="$root/workspace"
+  echo "↻ relaunching $(basename "$root") — type /4loops for the menu…" >&2
+  cd "$ws" && exec claude --plugin-dir "$PLUGIN_DIR"
 }
 
 cmd_list() {
@@ -329,6 +388,8 @@ cmd_prune() {  # remove ALL sandboxes in both bases — the "clean up dead works
 
 # ── Dispatch ──────────────────────────────────────────────────────────────────
 case "${1:-}" in
+  demo)              shift; cmd_demo "$@" ;;
+  relaunch|open)     shift; cmd_relaunch "${1:-}" ;;
   new)               shift; parse_new_args "$@"; cmd_new ;;
   refresh)           shift; cmd_refresh "${1:-}" ;;
   expire)            shift; cmd_expire "${1:-}" ;;
@@ -336,5 +397,5 @@ case "${1:-}" in
   rm)                shift; cmd_rm "${1:-}" ;;
   prune)             cmd_prune ;;
   ""|-h|--help|help) usage ;;
-  *)                 die "unknown subcommand: $1 (try: new|refresh|list|rm|prune)" ;;
+  *)                 die "unknown subcommand: $1 (try: demo|relaunch|new|refresh|expire|list|rm|prune)" ;;
 esac
