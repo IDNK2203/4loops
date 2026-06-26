@@ -100,7 +100,7 @@ awk -F'|' \
       }
     }
     if (mark != "") mark = mark " "
-    sub(/ — (why|context|type|due):.*/, "", c)
+    sub(/ — (why|context|type|due|branch):.*/, "", c)
     if (match(c, /^\[[^]]*\] \*\*[^*]*\*\* /)) {
       p = substr(c, 1, RLENGTH); t = substr(c, RLENGTH + 1)
       if (length(t) > MAXTITLE) t = substr(t, 1, MAXTITLE - 1) "…"

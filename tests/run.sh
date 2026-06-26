@@ -541,5 +541,36 @@ ck "gate: USER env override is honored (allowed)"      '! { gjson "echo x > proj
 ck "gate: bash-gate no longer parses override from cmd" '! grep -q "cmd.*in.*VT_ALLOW_STALE_GATE=1" "$PLUGIN/hooks/vt-bash-gate.sh"'
 unset VT_DIR
 
+echo
+echo "════ 22. Spine seam: branch binding (build-rail foundation) ════"
+W22=$(mktemp -d); export VT_DIR="$W22/.4loops"
+source "$S/vt-priorities-lib.sh"
+# --branch at draft sets the field; a plain draft stays branch-free (v1/v2 back-compat).
+BID=$(bash "$S/vt-draft.sh" P0 "rail seam" "" "" --branch feat/seam | grep -oE 'P0-[0-9]+')
+NID=$(bash "$S/vt-draft.sh" P0 "no branch here"                      | grep -oE 'P0-[0-9]+')
+ck "draft --branch: cell carries the field"       'grep -q "branch: feat/seam" "$VT_DIR/board.md"'
+ck "draft --branch: story_branch reads it"        '[ "$(story_branch "$BID")" = "feat/seam" ]'
+ck "draft --branch: reverse story_id_by_branch"   '[ "$(story_id_by_branch feat/seam)" = "'"$BID"'" ]'
+ck "draft default: branch-free (back-compat)"     '[ -z "$(story_branch "$NID")" ]'
+ck "branch: stripped from story_title"            '! printf "%s" "$(story_title "$BID")" | grep -q branch'
+ck "branch: hidden in compact board view"         '! bash "$S/vt-render.sh" | grep -q "branch:"'
+ck "branch: shown in single-state FULL view"      'bash "$S/vt-render.sh" backlog | grep -q "branch: feat/seam"'
+# Bind at the in-progress transition (the chosen UX: branch known when work starts).
+TID=$(bash "$S/vt-draft.sh" P0 "bind on start" | grep -oE 'P0-[0-9]+')
+bash "$S/vt-transition.sh" "$TID" in-progress --branch feat/start >/dev/null
+ck "transition --branch: binds on the move"       '[ "$(story_branch "$TID")" = "feat/start" ]'
+ck "transition --branch: story moved too"         '[ "$(story_state "$TID")" = "in-progress" ]'
+# Re-binding replaces the old value (no duplicate token, old branch gone).
+bash "$S/vt-transition.sh" "$TID" testing --branch feat/renamed >/dev/null
+ck "transition --branch: re-bind sets new"        '[ "$(story_branch "$TID")" = "feat/renamed" ]'
+ck "transition --branch: old binding removed"     '! grep -q "feat/start" "$VT_DIR/board.md"'
+# A plain transition (no --branch) preserves the binding byte-for-byte.
+bash "$S/vt-transition.sh" "$TID" done >/dev/null
+ck "transition (no flag): branch preserved"       '[ "$(story_branch "$TID")" = "feat/renamed" ]'
+# A pipe in the branch name is sanitized so it can't split the cell.
+PID=$(bash "$S/vt-draft.sh" P0 "pipe branch" "" "" --branch 'a|b' | grep -oE 'P0-[0-9]+')
+ck "draft --branch: pipe sanitized (no raw |)"    '! printf "%s" "$(story_branch "$PID")" | grep -q "[|]"'
+unset VT_DIR
+
 echo "════ RESULT: $P passed, $F failed ════"
 [ "$F" -eq 0 ]

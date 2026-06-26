@@ -12,16 +12,20 @@
 # --by <id>  records the superseding story on a `superseded` transition.
 set -euo pipefail
 
-ID=""; NEW_STATE=""; BACKDATE=""; BY=""
+ID=""; NEW_STATE=""; BACKDATE=""; BY=""; BRANCH=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --backdate) BACKDATE="${2:-}"; shift 2 ;;
     --by)       BY="${2:-}"; shift 2 ;;
+    --branch)   BRANCH="${2:-}"; shift 2 ;;
     *) if [ -z "$ID" ]; then ID="$1"; elif [ -z "$NEW_STATE" ]; then NEW_STATE="$1"; fi; shift ;;
   esac
 done
 [ -n "$ID" ] && [ -n "$NEW_STATE" ] || {
-  echo "usage: vt-transition <id> <new-state> [--backdate YYYY-MM-DD] [--by <id>]" >&2; exit 1; }
+  echo "usage: vt-transition <id> <new-state> [--branch <name>] [--backdate YYYY-MM-DD] [--by <id>]" >&2; exit 1; }
+# --branch binds the story to a git branch (the build rail reads this). Sanitize the
+# pipe so it can't split the cell; applied on grid moves only (terminal states drop the cell).
+BRANCH="${BRANCH//|/│}"
 
 case "$NEW_STATE" in
   backlog|planning|in-progress|testing|done|abandoned|superseded) ;;
@@ -89,7 +93,7 @@ fi
 # Rebuild the board as a DENSE grid, moving ID's cell to NEW_COL. Co-located
 # stories on ID's row are preserved (dense storage = many stories per row), so we
 # can't just replace the row — we re-grid the whole body.
-awk -v id="$ID" -v newcol="$NEW_COL" '
+awk -v id="$ID" -v newcol="$NEW_COL" -v branch="$BRANCH" '
   BEGIN { FS = "|" }
   /^\| Backlog \| Planning \| In Progress \| Testing \| Done \|$/ { print; hdr = 1; next }
   hdr && /^\| --/ { print; inbody = 1; next }
@@ -97,7 +101,17 @@ awk -v id="$ID" -v newcol="$NEW_COL" '
     for (i = 2; i <= 6; i++) {
       c = $i; gsub(/^ +| +$/, "", c)
       if (c == "") continue
-      col = (index(c, "**" id "**") > 0) ? newcol : (i - 1)
+      if (index(c, "**" id "**") > 0) {
+        col = newcol
+        # Bind this story to a branch (build-rail seam). Replace any stale binding,
+        # then append fresh so branch stays the last field.
+        if (branch != "") {
+          sub(/ — branch: [^ ]+/, "", c)
+          c = c " — branch: " branch
+        }
+      } else {
+        col = i - 1
+      }
       cells[col, ++n[col]] = c
     }
     next

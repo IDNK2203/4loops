@@ -120,8 +120,8 @@ story_title() {
           cell = cells[i]
           # Strip leading " [PROJ] **ID** "
           sub(/^ *\[[^]]*\] \*\*[^*]*\*\* */, "", cell)
-          # Strip trailing metadata: " — why:/context:/type:/due: ..."
-          sub(/ — (why|context|type|due):.*/, "", cell)
+          # Strip trailing metadata: " — why:/context:/type:/due:/branch: ..."
+          sub(/ — (why|context|type|due|branch):.*/, "", cell)
           gsub(/^ +| +$/, "", cell)
           print cell
           exit
@@ -171,6 +171,51 @@ story_deadline() {
         exit
       }
       exit
+    }
+  ' "$BOARD"
+}
+
+# Return a story's bound git branch, or empty. The value is appended as the last
+# cell field by vt-draft --branch / vt-transition --branch; it has no spaces (git
+# refs don't), so it reads cleanly until the next space or end-of-cell. "branch: "
+# is 8 ASCII bytes → RSTART/RLENGTH offsets stay byte-safe past the em-dash.
+# CELL-SCOPED for the same reason as story_type — match within THIS story's cell.
+# (Build-rail seam: the rail binds its branch check to this instead of plan frontmatter.)
+story_branch() {
+  local id="$1"
+  [ ! -f "$BOARD" ] && return
+  awk -v id="$id" '
+    index($0, "**" id "**") {
+      n = split($0, cells, "|")
+      for (i = 1; i <= n; i++) if (index(cells[i], "**" id "**")) {
+        if (match(cells[i], /branch: [^ ]+/)) print substr(cells[i], RSTART + 8, RLENGTH - 8)
+        exit
+      }
+      exit
+    }
+  ' "$BOARD"
+}
+
+# Reverse lookup: given a branch name, return the story ID bound to it (or empty).
+# The build rail calls this with the current git branch to find the owning story,
+# then composes with story_state to enforce "this branch belongs to an active story".
+# First match wins; scans the kanban rows (Projects rows carry no branch field).
+story_id_by_branch() {
+  local want="$1"
+  [ -z "$want" ] && return
+  [ ! -f "$BOARD" ] && return
+  awk -v want="$want" '
+    /^\|/ {
+      n = split($0, cells, "|")
+      for (i = 1; i <= n; i++) {
+        c = cells[i]
+        if (match(c, /branch: [^ ]+/)) {
+          b = substr(c, RSTART + 8, RLENGTH - 8)
+          if (b == want && match(c, /\*\*[A-Z0-9]+-[0-9]+\*\*/)) {
+            print substr(c, RSTART + 2, RLENGTH - 4); exit
+          }
+        }
+      }
     }
   ' "$BOARD"
 }
