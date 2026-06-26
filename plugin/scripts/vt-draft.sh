@@ -13,18 +13,20 @@ set -euo pipefail
 TYPE="dev"
 BACKDATE=""
 DEADLINE=""
+BRANCH=""
 ARGS=()
 while [ $# -gt 0 ]; do
   case "$1" in
     --type)     TYPE="${2:-dev}"; shift 2 ;;
     --backdate) BACKDATE="${2:-}"; shift 2 ;;
     --deadline) DEADLINE="${2:-}"; shift 2 ;;
+    --branch)   BRANCH="${2:-}"; shift 2 ;;
     *)          ARGS+=("$1"); shift ;;
   esac
 done
 set -- ${ARGS[@]+"${ARGS[@]}"}
 
-USAGE="usage: vt-draft <project> <title> [why] [context] [--type dev|modeling] [--deadline YYYY-MM-DD] [--backdate YYYY-MM-DD]"
+USAGE="usage: vt-draft <project> <title> [why] [context] [--type dev|modeling] [--deadline YYYY-MM-DD] [--branch <name>] [--backdate YYYY-MM-DD]"
 PROJECT="${1:?$USAGE}"
 TITLE="${2:?$USAGE}"
 WHY="${3:-}"
@@ -44,6 +46,7 @@ PROJECT="${PROJECT//|/│}"
 TITLE="${TITLE//|/│}"
 WHY="${WHY//|/│}"
 CONTEXT="${CONTEXT//|/│}"
+BRANCH="${BRANCH//|/│}"
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 "$SCRIPT_DIR/vt-init.sh" >/dev/null
@@ -75,6 +78,8 @@ CELL="[${PROJECT}] **${ID}** ${TITLE}"
 [ -n "$DEADLINE" ] && CELL="${CELL} — due: ${DEADLINE}"
 [ -n "$WHY" ] && CELL="${CELL} — why: ${WHY}"
 [ -n "$CONTEXT" ] && CELL="${CELL} — context: $(ctx_render "$CONTEXT")"
+# branch goes LAST so it strips with the metadata tail (stays out of compact views).
+[ -n "$BRANCH" ] && CELL="${CELL} — branch: ${BRANCH}"
 
 # Auto-register project in Projects table if not already present
 PROJECT_EXISTS=$(awk -v proj="$PROJECT" -F'|' '
