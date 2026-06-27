@@ -64,7 +64,10 @@ fi
 
 # --- Build ONE premium dashboard string ----------------------------------------
 nl=$'\n'
-D="── 4loops · ${WORKSPACE} ──${nl}"
+SENTINEL_STATE="on watch"
+if [ "$TODAY_STALE" = true ] || [ "$WEEK_STALE" = true ]; then SENTINEL_STATE="drift — let's reconcile"; fi
+D=" ╭◎ ◎╮  4loops · ${WORKSPACE}${nl}"
+D="${D} ╰─▿─╯  ${SENTINEL_STATE}${nl}"
 [ -n "$COUNTS_LINE" ] && D="${D}${COUNTS_LINE}${nl}"
 [ -n "$WARN_LINE" ] && D="${D}${WARN_LINE}${nl}"
 D="${D}${nl}"
