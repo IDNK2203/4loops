@@ -1,6 +1,6 @@
 ---
 name: manage
-description: State-move escape — move stories across the board (start / testing / done / park) and retire dead work (abandon / supersede), directly. A hidden power-user hatch; the normal way to move state is to just say it in /nav. Never captures and never sets priority — state only.
+description: State-move escape — move stories across the board (start / testing / done / park) and retire dead work (abandon / supersede), directly. A hidden power-user hatch; the normal way to move state is to just say it in /sync. Never captures and never sets priority — state only.
 allowed-tools: Bash, AskUserQuestion
 disable-model-invocation: true
 user-invocable: true
@@ -8,9 +8,9 @@ argument-hint: "[<id> <state> | <id> abandoned | <id> superseded --by <id2>]"
 ---
 
 `/manage` is a **thin, state-only escape** for moving stories across the board by hand. It is **not
-the main path** — between rituals you just say what moved in `/nav` and it transitions for you. This
+the main path** — between rituals you just say what moved in `/sync` and it transitions for you. This
 exists for the rare direct move. It only changes a story's **state**: it never captures new work
-(that's `/capture` or `/nav`) and never sets focus (that's `/prioritize` or `/nav`).
+(that's `/capture` or `/sync`) and never sets focus (that's `/prioritize` or `/sync`).
 
 User-invoked only (`disable-model-invocation: true`) — the agent can't fire it on its own.
 

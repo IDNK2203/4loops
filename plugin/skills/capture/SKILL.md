@@ -1,6 +1,6 @@
 ---
 name: capture
-description: Capture escape — brain-dump a batch of work in plain language and it drafts the stories onto the board (with type + deadline). A hidden power-user hatch; the normal way to capture is to just say it in /nav. It captures only — never sets priority, never moves state.
+description: Capture escape — brain-dump a batch of work in plain language and it drafts the stories onto the board (with type + deadline). A hidden power-user hatch; the normal way to capture is to just say it in /sync. It captures only — never sets priority, never moves state.
 allowed-tools: Bash, AskUserQuestion
 disable-model-invocation: true
 user-invocable: true
@@ -8,7 +8,7 @@ argument-hint: "<describe the work you want to capture>"
 ---
 
 `/capture` turns a brain-dump into board stories. It is a **thin escape** — the main path is to just
-say what's new in `/nav`, which captures as you talk. This exists for the case you want to dump a
+say what's new in `/sync`, which captures as you talk. This exists for the case you want to dump a
 batch directly. You describe work in plain language; I parse it into stories (with type + deadline)
 and draft them onto the board. **Invoking `/capture` is your go** — I show what I'm capturing, then
 create it. I don't reorganize or reprioritize; capture is all this does.
@@ -59,7 +59,7 @@ Show the preview to the user as you create — if they immediately object, you'v
 
 ### 4. Hand priority back
 
-Every story lands in **Backlog**. Do **not** set focus — tell the user to choose what to work on via `/nav` (or `/4loops:prioritize add <id…>`). Priority stays the operator's.
+Every story lands in **Backlog**. Do **not** set focus — tell the user to choose what to work on via `/sync` (or `/4loops:prioritize add <id…>`). Priority stays the operator's.
 
 ## Notes
 
