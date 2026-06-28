@@ -59,6 +59,16 @@
           }
         ]
       }
+    ],
+    "UserPromptExpansion": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/vt-cap.sh\""
+          }
+        ]
+      }
     ]
   }
 }

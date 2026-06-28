@@ -176,6 +176,7 @@ vt_is_rail_record() {
   case "$1" in
     */.4loops/board.md|*/.4loops/current-priorities.md) return 0 ;;
     .4loops/board.md|.4loops/current-priorities.md)      return 0 ;;
+    */.4loops/.cap/*|.4loops/.cap/*)                     return 0 ;;  # W4+ (v2.4): capability tokens are hook-written, agent-unwritable
   esac
   return 1
 }
@@ -189,6 +190,72 @@ vt_log_record_override() {
 
 vt_record_deny_reason() {
   printf '%s' "4loops: the board records (board.md / current-priorities.md) are rail-owned — hand-editing desyncs counts + transitions.log. Do NOT hand-edit them yourself. Just talk to /4loops:sync (say what's new, what moved, what's done) and it moves the board for you; or run the rituals /4loops:today and /4loops:week. Hand-editing is the USER's decision alone — only if THEY explicitly ask (it's logged)."
+}
+
+# ── Per-session capability grant (v2.4: rails are operator-invoked) ──────────
+# A user-typed slash command (/4loops:<cmd>) is the ONLY un-forgeable "the USER
+# initiated this" signal: it fires UserPromptExpansion with command_name, whereas
+# the agent's skill route is PreToolUse tool_name=Skill — which does NOT (verified
+# by hand-test 2026-06-28). vt-cap.sh records the invoked command here; the
+# bash-gate then allows a rail-script invocation only if a fresh grant covers it.
+# The token file is a W4 rail-record (above) so the agent can't forge it by writing.
+# Session-scoped, matching /sync's "standing consent for this working session".
+vt_cap_dir()  { printf '%s' "$VT_DIR/.cap"; }
+vt_cap_file() { printf '%s' "$VT_DIR/.cap/$1"; }   # $1 = session_id
+
+# Record the user-invoked command for this session (bare name, no "4loops:").
+vt_write_cap() {
+  local sid="$1" cmd="$2"
+  sid=$(printf '%s' "$sid" | tr -cd 'A-Za-z0-9._-')
+  cmd=$(printf '%s' "$cmd" | tr -cd 'A-Za-z0-9._-')
+  [ -z "$sid" ] && return 0
+  mkdir -p "$(vt_cap_dir)" 2>/dev/null || return 0
+  printf '%s' "$cmd" > "$(vt_cap_file "$sid")" 2>/dev/null || true
+}
+
+# Read the bare command granted this session (strips any "4loops:" prefix).
+vt_read_cap() {
+  local sid="$1" raw=""
+  sid=$(printf '%s' "$sid" | tr -cd 'A-Za-z0-9._-')
+  [ -z "$sid" ] && { printf ''; return 0; }
+  raw=$(cat "$(vt_cap_file "$sid")" 2>/dev/null) || raw=""
+  printf '%s' "${raw#*:}"
+}
+
+# Classify a rail script (basename minus .sh) into an enforcement tier:
+#   gateclear-today / gateclear-week → the gate-clearing rituals (strict match)
+#   mutate   → board-state writers
+#   readonly → display/query (never gated)
+#   ""       → not one of ours (fail-open → allow)
+vt_rail_tier() {
+  case "$1" in
+    vt-today) printf 'gateclear-today' ;;
+    vt-week)  printf 'gateclear-week' ;;
+    vt-transition|vt-priority|vt-draft|vt-arrange|vt-close|vt-repack|vt-refresh-counts|vt-gc|vt-init|vt-config) printf 'mutate' ;;
+    vt-render|vt-drift|vt-next-id|vt-detect) printf 'readonly' ;;
+    *) printf '' ;;
+  esac
+}
+
+# Does this session's capability (bare cmd) cover the rail's tier?
+vt_cap_allows() {
+  local cap="$1" tier="$2"
+  case "$tier" in
+    ''|readonly)     return 0 ;;                                  # not ours / read-only → allow
+    gateclear-today) [ "$cap" = "today" ] && return 0 || return 1 ;;
+    gateclear-week)  [ "$cap" = "week" ]  && return 0 || return 1 ;;
+    mutate)
+      case "$cap" in
+        sync|today|week|capture|manage|prioritize|configure) return 0 ;;
+      esac
+      return 1 ;;
+  esac
+  return 1
+}
+
+# Deny directive for a bare rail invocation lacking capability.
+vt_cap_deny_reason() {
+  printf '%s' "4loops: rail scripts (vt-*.sh) are operator-invoked, not for direct agent use. To move the board, the operator runs /4loops:sync (just say what changed); to reconcile, the rituals /4loops:today or /4loops:week. Do NOT call the rail scripts yourself — surface this and ask the operator to invoke the right command. (Read-only render/drift rails are never blocked.)"
 }
 
 # ── Override logging (the only escape — per-action, re-arms next call) ────────

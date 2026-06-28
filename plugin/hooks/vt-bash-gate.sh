@@ -35,6 +35,33 @@ override=0
 rec_override=0
 [ "${VT_ALLOW_RECORD_WRITE:-}" = "1" ] && rec_override=1
 
+# v2.4 break-glass for the rail-invocation check (env-only; the user's launch
+# shell, never the agent — same reason an inline VAR=1 prefix is not honored).
+rail_override=0
+[ "${VT_ALLOW_RAIL:-}" = "1" ] && rail_override=1
+
+# ── v2.4 capability check: rail scripts (vt-*.sh) are operator-invoked ────────
+# Detect any vt-*.sh invocation in the command and require a session capability
+# (minted by vt-cap.sh on a user-typed /4loops:<cmd>). Runs before target
+# extraction because rail invocations usually carry no write redirect to catch.
+# Read-only rails (render/drift/…) are never gated. FAIL-OPEN on any error.
+caprails=$(printf '%s\n' "$cmd" | grep -oE 'vt-[a-z-]+\.sh' | sed -E 's/\.sh$//' | sort -u)
+if [ -n "$caprails" ] && [ "$rail_override" = "0" ]; then
+  caproot=$(vt_find_workspace_root "${cwd:-$PWD}") || caproot=""
+  if [ -n "$caproot" ]; then
+    export VT_DIR="$caproot/.4loops"
+    if vt_rail_armed; then
+      cap=$(vt_read_cap "$sid")
+      while IFS= read -r rname; do
+        [ -z "$rname" ] && continue
+        vt_cap_allows "$cap" "$(vt_rail_tier "$rname")" || vt_emit_deny "$(vt_cap_deny_reason)"
+      done <<EOF
+$caprails
+EOF
+    fi
+  fi
+fi
+
 # Extract candidate write targets: > / >> redirects, tee [-a] files, sed -i.
 extract_targets() {
   # redirects ( > file , >> file ) — exclude >& and >(...) process subs
