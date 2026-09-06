@@ -609,5 +609,56 @@ ck "rail-tier: vt-store-list is readonly"         '[ "$(vt_rail_tier vt-store-li
 ck "rail-record: store path protected"            'vt_is_rail_record "$VT_DIR/store/items/x"'
 unset VT_DIR
 
+
+echo "════ 24. v2.5 Track B: scope promote (capacity only, no board) ════"
+W24=$(mktemp -d); export VT_DIR="$W24/.4loops"
+bash "$S/vt-init.sh" >/dev/null
+printf 'P0\tScope happy path\tdev\tpacket-003\t2026-09-20\n' | bash "$S/vt-store-capture.sh" >/tmp/vt-scope-cap-out.txt
+SID=$(awk '/^captured:/{print $2; exit}' /tmp/vt-scope-cap-out.txt)
+bash "$S/vt-store-expire.sh" --activate "$SID" >/dev/null
+BOARD_SHA_BEFORE=$(shasum -a 256 "$VT_DIR/board.md" | awk '{print $1}')
+bash "$S/vt-scope-promote.sh" "$SID" \
+  --deadline 2026-09-20 \
+  --impact "unblocks dogfood" \
+  --resource "1d" >/tmp/vt-scope-promo-out.txt
+BOARD_SHA_AFTER=$(shasum -a 256 "$VT_DIR/board.md" | awk '{print $1}')
+ck "scope-promote: writes tasks/P0/<id>.md"       '[ -f "$VT_DIR/tasks/P0/'"$SID"'.md" ]'
+ck "scope-promote: capacity deadline present"     'grep -q "^deadline: 2026-09-20$" "$VT_DIR/tasks/P0/'"$SID"'.md"'
+ck "scope-promote: capacity impact present"       'grep -q "^impact: unblocks dogfood$" "$VT_DIR/tasks/P0/'"$SID"'.md"'
+ck "scope-promote: capacity resource present"     'grep -q "^resource: 1d$" "$VT_DIR/tasks/P0/'"$SID"'.md"'
+ck "scope-promote: no modeling section"           '! grep -qiE "^##[[:space:]]*(Model|Modeling|Implementation[ -]?[Pp]lan|Architecture|Design)" "$VT_DIR/tasks/P0/'"$SID"'.md"'
+ck "scope-promote: board.md hash unchanged"       '[ "'"$BOARD_SHA_BEFORE"'" = "'"$BOARD_SHA_AFTER"'" ]'
+ck "scope-promote: store annotated scoped_at"     'grep -q "^scoped_at=" "$VT_DIR/store/items/'"$SID"'"'
+ck "scope-promote: store state still active"      'grep -q "^state=active$" "$VT_DIR/store/items/'"$SID"'"'
+# Illegal: captured (not active)
+printf 'P0\tNot active yet\tdev\tx\t\n' | bash "$S/vt-store-capture.sh" >/tmp/vt-scope-cap2.txt
+SID2=$(awk '/^captured:/{print $2; exit}' /tmp/vt-scope-cap2.txt)
+if bash "$S/vt-scope-promote.sh" "$SID2" --deadline 2026-09-21 --impact "x" --resource "1h" >/tmp/vt-scope-bad.txt 2>/tmp/vt-scope-bad.err; then
+  BAD_RC=0
+else
+  BAD_RC=$?
+fi
+ck "scope-promote: refuse non-active"             '[ "'"$BAD_RC"'" != "0" ]'
+# Illegal: missing capacity flag
+if bash "$S/vt-scope-promote.sh" "$SID" --deadline 2026-09-20 --impact "only" >/dev/null 2>&1; then MISSING_RC=0; else MISSING_RC=$?; fi
+ck "scope-promote: refuse missing resource"       '[ "'"$MISSING_RC"'" != "0" ]'
+# Double-promote without --force fails; with --force ok
+if bash "$S/vt-scope-promote.sh" "$SID" --deadline 2026-09-22 --impact "retry" --resource "2d" >/dev/null 2>&1; then DUP_RC=0; else DUP_RC=$?; fi
+ck "scope-promote: refuse duplicate without --force" '[ "'"$DUP_RC"'" != "0" ]'
+bash "$S/vt-scope-promote.sh" "$SID" --deadline 2026-09-22 --impact "retry" --resource "2d" --force >/dev/null
+ck "scope-promote: --force re-promote"            'grep -q "^deadline: 2026-09-22$" "$VT_DIR/tasks/P0/'"$SID"'.md"'
+# list + read
+ck "scope-list: shows promoted id"                'bash "$S/vt-scope-list.sh" P0 | grep -q "'"$SID"'"'
+ck "scope-read: prints doc"                       'bash "$S/vt-scope-read.sh" "'"$SID"'" | grep -q "Capacity judgment only"'
+# Rail tier wiring
+source "$S/vt-guard-lib.sh"
+ck "rail-tier: vt-scope-promote is mutate"        '[ "$(vt_rail_tier vt-scope-promote)" = "mutate" ]'
+ck "rail-tier: vt-scope-list is readonly"         '[ "$(vt_rail_tier vt-scope-list)" = "readonly" ]'
+ck "rail-tier: vt-scope-read is readonly"         '[ "$(vt_rail_tier vt-scope-read)" = "readonly" ]'
+ck "rail-record: tasks path protected"            'vt_is_rail_record "$VT_DIR/tasks/P0/x.md"'
+# cap allows scope
+ck "cap-allows: scope covers mutate"              'vt_cap_allows scope mutate'
+unset VT_DIR
+
 echo "════ RESULT: $P passed, $F failed ════"
 [ "$F" -eq 0 ]

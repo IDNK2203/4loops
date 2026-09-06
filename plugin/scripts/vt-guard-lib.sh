@@ -178,6 +178,7 @@ vt_is_rail_record() {
     .4loops/board.md|.4loops/current-priorities.md)      return 0 ;;
     */.4loops/.cap/*|.4loops/.cap/*)                     return 0 ;;  # W4+ (v2.4): capability tokens are hook-written, agent-unwritable
     */.4loops/store/*|.4loops/store/*)                   return 0 ;;  # v2.5 Track A: detached backlog store is rail-owned
+    */.4loops/tasks/*|.4loops/tasks/*)                   return 0 ;;  # v2.5 Track B: ephemeral scope docs are rail-owned
   esac
   return 1
 }
@@ -190,7 +191,7 @@ vt_log_record_override() {
 }
 
 vt_record_deny_reason() {
-  printf '%s' "4loops: the board/store records (board.md / current-priorities.md / store/) are rail-owned — hand-editing desyncs counts + transitions.log. Do NOT hand-edit them yourself. Just talk to /4loops:sync (say what's new, what moved, what's done) and it moves the board for you; or run the rituals /4loops:today and /4loops:week. Hand-editing is the USER's decision alone — only if THEY explicitly ask (it's logged)."
+  printf '%s' "4loops: the board/store records (board.md / current-priorities.md / store/ / tasks/) are rail-owned — hand-editing desyncs counts + transitions.log. Do NOT hand-edit them yourself. Just talk to /4loops:sync (say what's new, what moved, what's done) and it moves the board for you; or run the rituals /4loops:today and /4loops:week. Hand-editing is the USER's decision alone — only if THEY explicitly ask (it's logged)."
 }
 
 # ── Per-session capability grant (v2.4: rails are operator-invoked) ──────────
@@ -232,8 +233,8 @@ vt_rail_tier() {
   case "$1" in
     vt-today) printf 'gateclear-today' ;;
     vt-week)  printf 'gateclear-week' ;;
-    vt-transition|vt-priority|vt-draft|vt-arrange|vt-close|vt-repack|vt-refresh-counts|vt-gc|vt-init|vt-config|vt-store-capture|vt-store-expire) printf 'mutate' ;;
-    vt-render|vt-drift|vt-next-id|vt-detect|vt-store-list) printf 'readonly' ;;
+    vt-transition|vt-priority|vt-draft|vt-arrange|vt-close|vt-repack|vt-refresh-counts|vt-gc|vt-init|vt-config|vt-store-capture|vt-store-expire|vt-scope-promote) printf 'mutate' ;;
+    vt-render|vt-drift|vt-next-id|vt-detect|vt-store-list|vt-scope-list|vt-scope-read) printf 'readonly' ;;
     *) printf '' ;;
   esac
 }
@@ -247,7 +248,7 @@ vt_cap_allows() {
     gateclear-week)  [ "$cap" = "week" ]  && return 0 || return 1 ;;
     mutate)
       case "$cap" in
-        sync|today|week|capture|manage|prioritize|configure) return 0 ;;
+        sync|today|week|capture|scope|manage|prioritize|configure) return 0 ;;
       esac
       return 1 ;;
   esac
