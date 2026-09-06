@@ -486,12 +486,12 @@ unset VT_DIR
 # CONFIG-FIRST: every board command's skill checks for .4loops/config in step 0.
 ck "config-first: /today checks config"          'grep -q "\.4loops/config" "$PLUGIN/skills/today/SKILL.md"'
 ck "config-first: /week checks config"           'grep -q "\.4loops/config" "$PLUGIN/skills/week/SKILL.md"'
-ck "config-first: /nav checks config"            'grep -q "\.4loops/config" "$PLUGIN/skills/nav/SKILL.md"'
+ck "config-first: /sync checks config"            'grep -q "\.4loops/config" "$PLUGIN/skills/sync/SKILL.md"'
 ck "config-first: /capture checks config"        'grep -q "\.4loops/config" "$PLUGIN/skills/capture/SKILL.md"'
 ck "config-first: /prioritize checks config"     'grep -q "\.4loops/config" "$PLUGIN/skills/prioritize/SKILL.md"'
 ck "config-first: /manage checks config"         'grep -q "\.4loops/config" "$PLUGIN/skills/manage/SKILL.md"'
 # USER-ONLY: every board-mutating skill is disable-model-invocation; /board stays read-only-invocable.
-ck "user-only: /nav"                             'grep -q "disable-model-invocation: true" "$PLUGIN/skills/nav/SKILL.md"'
+ck "user-only: /sync"                             'grep -q "disable-model-invocation: true" "$PLUGIN/skills/sync/SKILL.md"'
 ck "user-only: /capture"                         'grep -q "disable-model-invocation: true" "$PLUGIN/skills/capture/SKILL.md"'
 ck "user-only: /prioritize"                      'grep -q "disable-model-invocation: true" "$PLUGIN/skills/prioritize/SKILL.md"'
 ck "user-only: /manage"                          'grep -q "disable-model-invocation: true" "$PLUGIN/skills/manage/SKILL.md"'
@@ -507,8 +507,8 @@ ck "record msg: agent told not to hand-edit"     'grep -q "Do NOT hand-edit them
 
 echo
 echo "════ 20. /nav + priority-annotated render (v2.2) ════"
-ck "nav: operate-never-simulate contract"        'grep -qi "never simulate\|Re-render as proof" "$PLUGIN/skills/nav/SKILL.md"'
-ck "nav: opens on the annotated board"           'grep -q -- "--priorities" "$PLUGIN/skills/nav/SKILL.md"'
+ck "sync: operate-never-simulate contract"        'grep -qi "never simulate\|Re-render as proof" "$PLUGIN/skills/sync/SKILL.md"'
+ck "sync: opens on the annotated board"           'grep -q -- "--priorities" "$PLUGIN/skills/sync/SKILL.md"'
 W20=$(mktemp -d); export VT_DIR="$W20/.4loops"; mkboard "$VT_DIR"; : > "$VT_DIR/transitions.log"; touch "$VT_DIR/config"
 PAST20=$(date -v-3d +%F 2>/dev/null || date -d '3 days ago' +%F)
 SOON20=$(date -v+1d +%F 2>/dev/null || date -d '1 day' +%F)
@@ -570,6 +570,43 @@ ck "transition (no flag): branch preserved"       '[ "$(story_branch "$TID")" = 
 # A pipe in the branch name is sanitized so it can't split the cell.
 PID=$(bash "$S/vt-draft.sh" P0 "pipe branch" "" "" --branch 'a|b' | grep -oE 'P0-[0-9]+')
 ck "draft --branch: pipe sanitized (no raw |)"    '! printf "%s" "$(story_branch "$PID")" | grep -q "[|]"'
+unset VT_DIR
+
+
+echo "════ 23. v2.5 Track A: detached store + expiry state machine ════"
+W23=$(mktemp -d); export VT_DIR="$W23/.4loops"
+bash "$S/vt-init.sh" >/dev/null
+# Capture does not touch board Backlog
+BOARD_BEFORE=$(wc -l < "$VT_DIR/board.md" | tr -d ' ')
+printf 'P0\tStore happy path item\tdev\tpacket-002 evidence\t2026-09-20\n' | bash "$S/vt-store-capture.sh" >/tmp/vt-store-cap-out.txt
+CAP_ID=$(awk '/^captured:/{print $2; exit}' /tmp/vt-store-cap-out.txt)
+BOARD_AFTER=$(wc -l < "$VT_DIR/board.md" | tr -d ' ')
+ck "store-capture: writes CAP id"                 '[ -n "'"$CAP_ID"'" ] && [ -f "$VT_DIR/store/items/'"$CAP_ID"'" ]'
+ck "store-capture: state=captured"                'grep -q "^state=captured$" "$VT_DIR/store/items/'"$CAP_ID"'"'
+ck "store-capture: board unchanged (no Backlog dump)" '[ "'"$BOARD_BEFORE"'" = "'"$BOARD_AFTER"'" ]'
+# Happy path: captured → active
+bash "$S/vt-store-expire.sh" --activate-only >/dev/null
+ck "store-expire: captured → active"              'grep -q "^state=active$" "$VT_DIR/store/items/'"$CAP_ID"'"'
+# Expiry path: force expire → clear
+bash "$S/vt-store-expire.sh" --force-expire "$CAP_ID" >/dev/null
+ck "store-expire: active → expired (force)"       'grep -q "^state=expired$" "$VT_DIR/store/items/'"$CAP_ID"'"'
+bash "$S/vt-store-expire.sh" --clear-id "$CAP_ID" >/dev/null
+ck "store-expire: expired → cleared (moved)"      '[ -f "$VT_DIR/store/cleared/'"$CAP_ID"'" ] && grep -q "^state=cleared$" "$VT_DIR/store/cleared/'"$CAP_ID"'"'
+ck "store: transitions.log has full chain"        'grep -q "captured" "$VT_DIR/store/transitions.log" && grep -q "active" "$VT_DIR/store/transitions.log" && grep -q "expired" "$VT_DIR/store/transitions.log" && grep -q "cleared" "$VT_DIR/store/transitions.log"'
+# TTL path: backdated active item expires on tick
+printf 'P0\tTTL expiry item\tdev\told capture\t\n' | bash "$S/vt-store-capture.sh" >/tmp/vt-store-cap2.txt
+CAP2=$(awk '/^captured:/{print $2; exit}' /tmp/vt-store-cap2.txt)
+bash "$S/vt-store-expire.sh" --activate "$CAP2" >/dev/null
+# Rewrite captured_at to 30 days ago (UTC)
+OLD=$(date -u -v-30d +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date -u -d '30 days ago' +"%Y-%m-%dT%H:%M:%SZ")
+awk -v o="$OLD" 'BEGIN{FS=OFS="="} $1=="captured_at"{$2=o} {print}' "$VT_DIR/store/items/$CAP2" > "$VT_DIR/store/items/$CAP2.tmp" && mv "$VT_DIR/store/items/$CAP2.tmp" "$VT_DIR/store/items/$CAP2"
+VT_STORE_TTL_DAYS=14 bash "$S/vt-store-expire.sh" --expire-only >/dev/null
+ck "store-expire: TTL active → expired"           'grep -q "^state=expired$" "$VT_DIR/store/items/'"$CAP2"'"'
+# Rail tier wiring
+source "$S/vt-guard-lib.sh"
+ck "rail-tier: vt-store-capture is mutate"        '[ "$(vt_rail_tier vt-store-capture)" = "mutate" ]'
+ck "rail-tier: vt-store-list is readonly"         '[ "$(vt_rail_tier vt-store-list)" = "readonly" ]'
+ck "rail-record: store path protected"            'vt_is_rail_record "$VT_DIR/store/items/x"'
 unset VT_DIR
 
 echo "════ RESULT: $P passed, $F failed ════"

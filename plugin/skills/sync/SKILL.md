@@ -61,7 +61,7 @@ For each thing the user says, classify the intent and run the matching rail. The
 
 | They say… | Intent | Rail |
 | --- | --- | --- |
-| "new task: X", "I need to Y", "add Z" | **capture** | `vt-draft.sh <P> "<title>" "<why>" "<doc>" --type <dev\|modeling> --deadline <YYYY-MM-DD>` |
+| "new task: X", "I need to Y", "add Z" | **capture** | `printf '…\t…\n' \| vt-store-capture.sh` (+ `vt-store-expire.sh --activate-only`) — detached `.4loops/store/`, not board Backlog |
 | "start X", "X is in progress / testing / done" | **move state** | `vt-transition.sh <id> <in-progress\|testing\|done>` |
 | "focus on X", "bump X to the top", "add X to today" | **prioritize** | `vt-priority.sh add <id…>` (or `set <id…>` to replace) |
 | "take X off today", "deprioritize X" | **prioritize** | `vt-priority.sh set <remaining ids…>` |
@@ -76,8 +76,8 @@ After running, re-render proof and keep it tight:
 **Capture defaults** (mirror how the operator actually talks):
 - **type** = `dev` unless the wording is exploratory ("spike", "figure out", "decide", "explore") → `modeling`.
 - **deadline** = set it when stated or implied ("by Friday", "before the demo") as `YYYY-MM-DD`; else none.
-- **priority** = only if the user states it ("high", "top", "today"). New work lands in **Backlog**;
-  don't auto-prioritize — capture and prioritize are separate acts, and priority stays the user's.
+- **priority** = only if the user states it ("high", "top", "today"). New work lands in the **detached store** (`.4loops/store/`, state `captured`→`active`);
+  don't auto-prioritize and don't draft onto board Backlog — capture and prioritize are separate acts, and priority stays the user's.
 - **project** = the sole project by default; infer from context when several; ask only if truly ambiguous.
 
 **Batch it.** If the user rattles off several things at once ("metrics is done, start the pricing
@@ -98,5 +98,5 @@ the board already reflects everything, because every change rode a rail.
   `/today`, but don't block their flow.
 - For a deliberate, structured pass (see-the-board-then-pick checkboxes), that's `/today` / `/week`.
   `/sync` is the talk-don't-click path. Same rails underneath.
-- The rails underneath (`vt-draft.sh`, `vt-transition.sh`, `vt-priority.sh`) are the same ones the
+- The rails underneath (`vt-store-capture.sh` for new work, `vt-transition.sh`, `vt-priority.sh`; `vt-draft.sh` only for intentional board drafts) are the same ones the
   rituals use; talking here just drives them conversationally instead of via checkboxes.
