@@ -32,11 +32,15 @@ TTL: `VT_STORE_TTL_DAYS` or `store_ttl_days: N` in `.4loops/config` (default 14)
 
 ## Step 0 — Require configuration
 
+Honor `VT_DIR` (rails sandbox) — default `./.4loops`:
+
 ```bash
-[ -f .4loops/config ] && echo CONFIGURED || echo UNCONFIGURED
+VT="${VT_DIR:-./.4loops}"
+[ -f "$VT/config" ] && echo CONFIGURED || echo UNCONFIGURED
 ```
 
-If `UNCONFIGURED`, stop: **"No 4loops board here yet — run `/4loops:configure` first."**
+If `UNCONFIGURED`, stop: **"No 4loops board here yet — run `/4loops:configure` first."**  
+Isolated sandbox tip: after `vt-init.sh`, you still need a `config` (run `/4loops:configure` or drop a minimal projects config into `$VT_DIR`). Store scripts already honor `VT_DIR`.
 
 ## Steps
 
@@ -45,7 +49,7 @@ If `UNCONFIGURED`, stop: **"No 4loops board here yet — run `/4loops:configure`
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/scripts/vt-render.sh"
 "${CLAUDE_PLUGIN_ROOT}/scripts/vt-store-list.sh" live
-cat .4loops/config 2>/dev/null
+cat "${VT_DIR:-./.4loops}/config" 2>/dev/null
 ```
 
 Read existing projects (Projects table / `config`). One project → that's the default; several → infer per item, ask only if genuinely ambiguous. Note anything already in the **store** (and on the board) so you don't duplicate it.
