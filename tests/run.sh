@@ -660,5 +660,60 @@ ck "rail-record: tasks path protected"            'vt_is_rail_record "$VT_DIR/ta
 ck "cap-allows: scope covers mutate"              'vt_cap_allows scope mutate'
 unset VT_DIR
 
+
+echo "════ 25. v2.5 Track C: priority levers + thin prioritize ════"
+W25=$(mktemp -d); export VT_DIR="$W25/.4loops"
+bash "$S/vt-init.sh" >/dev/null
+BOARD_SHA_BEFORE=$(shasum -a 256 "$VT_DIR/board.md" | awk '{print $1}')
+# default lever=later
+printf 'P0\tDefault lever item\tdev\tpacket-004\t2026-09-20\n' | bash "$S/vt-store-capture.sh" >/tmp/vt-lever-cap1.txt
+L1=$(awk '/^captured:/{print $2; exit}' /tmp/vt-lever-cap1.txt)
+ck "lever-capture: default lever=later"           'grep -q "^lever=later$" "$VT_DIR/store/items/'"$L1"'"'
+# explicit today + urgent
+printf 'P0\tToday item\tdev\tx\ttoday\n' | bash "$S/vt-store-capture.sh" >/tmp/vt-lever-cap2.txt
+L2=$(awk '/^captured:/{print $2; exit}' /tmp/vt-lever-cap2.txt)
+printf 'P0\tUrgent item\tdev\tx\turgent\n' | bash "$S/vt-store-capture.sh" >/tmp/vt-lever-cap3.txt
+L3=$(awk '/^captured:/{print $2; exit}' /tmp/vt-lever-cap3.txt)
+ck "lever-capture: explicit today"                'grep -q "^lever=today$" "$VT_DIR/store/items/'"$L2"'"'
+ck "lever-capture: explicit urgent"               'grep -q "^lever=urgent$" "$VT_DIR/store/items/'"$L3"'"'
+# due + lever (field5=date, field6=lever)
+printf 'P0\tDated today\tdev\tx\t2026-09-21\ttoday\n' | bash "$S/vt-store-capture.sh" >/tmp/vt-lever-cap4.txt
+L4=$(awk '/^captured:/{print $2; exit}' /tmp/vt-lever-cap4.txt)
+ck "lever-capture: due+lever today"               'grep -q "^lever=today$" "$VT_DIR/store/items/'"$L4"'" && grep -q "^deadline=2026-09-21$" "$VT_DIR/store/items/'"$L4"'"'
+# batch --lever
+printf 'P0\tBatch urgent\tdev\tx\t\n' | bash "$S/vt-store-capture.sh" --lever urgent >/tmp/vt-lever-cap5.txt
+L5=$(awk '/^captured:/{print $2; exit}' /tmp/vt-lever-cap5.txt)
+ck "lever-capture: --lever batch urgent"          'grep -q "^lever=urgent$" "$VT_DIR/store/items/'"$L5"'"'
+# list/filter by lever (capture then grep — avoid pipefail SIGPIPE with grep -q)
+LIST_TODAY=$(bash "$S/vt-store-list.sh" today)
+LIST_LATER=$(bash "$S/vt-store-list.sh" later)
+LIST_URGENT=$(bash "$S/vt-store-list.sh" --lever urgent)
+ck "lever-list: filter today"                     'printf "%s" "$LIST_TODAY" | grep -q "'"$L2"'"'
+ck "lever-list: filter later"                     'printf "%s" "$LIST_LATER" | grep -q "'"$L1"'"'
+ck "lever-list: --lever urgent"                   'printf "%s" "$LIST_URGENT" | grep -q "'"$L3"'"'
+# change lever without board writes
+bash "$S/vt-store-lever.sh" "$L1" urgent >/tmp/vt-lever-chg.txt
+ck "lever-change: later → urgent"                 'grep -q "^lever=urgent$" "$VT_DIR/store/items/'"$L1"'"'
+# pull to today
+bash "$S/vt-store-lever.sh" today "$L1" "$L3" >/tmp/vt-lever-today.txt
+ck "lever-pull: L1 → today"                       'grep -q "^lever=today$" "$VT_DIR/store/items/'"$L1"'"'
+ck "lever-pull: L3 → today"                       'grep -q "^lever=today$" "$VT_DIR/store/items/'"$L3"'"'
+BOARD_SHA_AFTER=$(shasum -a 256 "$VT_DIR/board.md" | awk '{print $1}')
+ck "lever: board.md hash unchanged"               '[ "'"$BOARD_SHA_BEFORE"'" = "'"$BOARD_SHA_AFTER"'" ]'
+# illegal lever
+if bash "$S/vt-store-lever.sh" "$L2" someday >/dev/null 2>&1; then BAD_LEV=0; else BAD_LEV=$?; fi
+ck "lever-change: refuse invalid lever"           '[ "'"$BAD_LEV"'" != "0" ]'
+# transitions log records lever edges
+ck "lever: transitions.log has lever edges"       'grep -q "lever:" "$VT_DIR/store/transitions.log"'
+# rail tiers
+source "$S/vt-guard-lib.sh"
+ck "rail-tier: vt-store-lever is mutate"          '[ "$(vt_rail_tier vt-store-lever)" = "mutate" ]'
+ck "rail-tier: vt-store-list still readonly"      '[ "$(vt_rail_tier vt-store-list)" = "readonly" ]'
+ck "cap-allows: prioritize covers mutate"         'vt_cap_allows prioritize mutate'
+# missing lever field on legacy item → later
+printf 'id=CAP-LEG\nproject=P0\ntitle=Legacy\ntype=dev\nwhy=\ndeadline=\nstate=active\ncaptured_at=2026-09-06T00:00:00Z\nactivated_at=2026-09-06T00:00:00Z\nexpired_at=\ncleared_at=\n' > "$VT_DIR/store/items/CAP-LEG"
+ck "lever-legacy: missing field reads as later"   '[ "$(bash -c "source \"'"$S"'/vt-store-lib.sh\"; vt_store_get_lever \"$VT_DIR/store/items/CAP-LEG\"")" = "later" ]'
+unset VT_DIR
+
 echo "════ RESULT: $P passed, $F failed ════"
 [ "$F" -eq 0 ]

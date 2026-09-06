@@ -233,7 +233,7 @@ vt_rail_tier() {
   case "$1" in
     vt-today) printf 'gateclear-today' ;;
     vt-week)  printf 'gateclear-week' ;;
-    vt-transition|vt-priority|vt-draft|vt-arrange|vt-close|vt-repack|vt-refresh-counts|vt-gc|vt-init|vt-config|vt-store-capture|vt-store-expire|vt-scope-promote) printf 'mutate' ;;
+    vt-transition|vt-priority|vt-draft|vt-arrange|vt-close|vt-repack|vt-refresh-counts|vt-gc|vt-init|vt-config|vt-store-capture|vt-store-expire|vt-store-lever|vt-scope-promote) printf 'mutate' ;;
     vt-render|vt-drift|vt-next-id|vt-detect|vt-store-list|vt-scope-list|vt-scope-read) printf 'readonly' ;;
     *) printf '' ;;
   esac
