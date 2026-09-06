@@ -58,6 +58,14 @@ workspace/
   confirm projects + week-start, and bootstrap spawns this week's focus. The session should
   end on a board full of your stories, not a template.
 
+## Real C dogfood (`demo c`)
+
+`bash sandbox/sandbox.sh demo c` = Track B's seeded board + a detached store with levers + a **prior
+Week** (backdated to last ISO week) + **yesterday's Today** — both stale, gate active, so `/4loops:week`
+and `/4loops:today` each open on carry-forward. Already configured; it prints the Real C accept walk and
+writes it to `workspace/DOGFOOD-REAL-C.md`. This is Packet 005 dogfood, not the beta A/B arc — see
+`BETA-WALKTHROUGH.md` → Track C.
+
 ## The walkthrough (seeded, isolated)
 
 1. **B3** — launch; the sentinel dashboard renders (cwd = workspace root).

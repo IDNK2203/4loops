@@ -38,7 +38,8 @@ sandbox.sh — clean-room workspaces for dogfooding 4loops
 USAGE
   sandbox.sh demo <a|b|c> [--no-launch] [--bypass]   ONE-SHOT: build a fresh, uniquely-named
                                  sandbox — a = empty (onboarding), b = seeded mid-week board,
-                                 c = b + detached store (levers) + yesterday's Today focus, for the
+                                 c = b + detached store (levers) + a prior Week + yesterday's Today
+                                 (both stale → week→week and day→day carry-forward visible), for the
                                  v2.5 Real C orientation loop (/week → /today → /prioritize) —
                                  and launch Claude in it. No prior workspace needed — run any time.
                                  --bypass launches with VT_ALLOW_STALE_GATE=1 (gate OFF, user-only).
@@ -166,22 +167,73 @@ seed_board() {  # <vt_dir> — drive the REAL vt CLI so seeding exercises it too
   : > "$vtdir/.armed"   # pre-arm: armed + stale focus = gate active, so B1 is demoable immediately
 }
 
-seed_store() {  # <vt_dir> — v2.5 Real C: a lived-in detached store + a stale (yesterday) Today
-  local vtdir="$1" d_yest d_soon  # focus, so /today has real carry-forward and a real store pull.
-  d_yest=$(date -v-1d +%F 2>/dev/null || date -d 'yesterday' +%F)
-  d_soon=$(date -v+2d +%F 2>/dev/null || date -d '2 days' +%F)
+seed_store() {  # <vt_dir> — v2.5 Real C: a lived-in detached store + a stale PRIOR Week (last
+  local vtdir="$1" d_yest d_due dow left lw  # ISO week) + a stale (yesterday) Today focus, so /week and
+  d_yest=$(date -v-1d +%F 2>/dev/null || date -d 'yesterday' +%F)   # /today both open on real carry-forward.
+  # Due date INSIDE the current ISO week (Mon start): +2d, clamped to the week's end; on a
+  # Sunday that is today itself (due-by is inclusive), so "due this week" is never empty.
+  dow=$(date +%u); left=$((7 - dow)); [ "$left" -gt 2 ] && left=2
+  d_due=$(date -v+"${left}"d +%F 2>/dev/null || date -d "${left} days" +%F)
+  lw=$(date -v-7d +%V 2>/dev/null || date -d '7 days ago' +%V)      # last ISO week number
   cap() { printf '%s\n' "$1" | VT_DIR="$vtdir" bash "$PLUGIN_SCRIPTS/vt-store-capture.sh" >/dev/null; }
   cap "$(printf 'WEB\tFix the login redirect loop\tdev\tsupport thread\turgent')"         # CAP-001 urgent
   cap "$(printf 'API\tRate-limit the metrics endpoint\tdev\tnoisy client\ttoday')"        # CAP-002 today
-  cap "$(printf 'WEB\tDraft the launch email\tdev\tmarketing asked\t%s' "$d_soon")"        # CAP-003 later, due this week
+  cap "$(printf 'WEB\tDraft the launch email\tdev\tmarketing asked\t%s' "$d_due")"         # CAP-003 later, due this week
   cap "$(printf 'API\tSpike: OpenTelemetry vs homegrown tracing\tmodeling\t\t')"          # CAP-004 later
   cap "$(printf 'WEB\tClean up the old dashboard branch\tdev\t\t')"                       # CAP-005 later
   VT_DIR="$vtdir" bash "$PLUGIN_SCRIPTS/vt-store-expire.sh" --activate-only >/dev/null
-  # Yesterday's Today focus (board + a CAP) — backdated so today starts from carry-forward.
-  ( cd "$vtdir/.." && VT_DIR="$vtdir" VT_ALLOW_TODAY_FIRST=1 bash "$PLUGIN_SCRIPTS/vt-today.sh" WEB-001 API-001 CAP-002 >/dev/null )  # cwd = workspace → doc title
+  # Prior Week anchors (board + a CAP) and yesterday's Today focus — written through the real
+  # rails from the workspace cwd (the doc title), then BACKDATED: Week → last ISO week, Today →
+  # yesterday. Both stale ⇒ the orientation gate is ACTIVE on launch, and /week → /today each
+  # open on carry-forward (week carries like day: still-alive anchors + store pull).
+  ( cd "$vtdir/.." && VT_DIR="$vtdir" bash "$PLUGIN_SCRIPTS/vt-week.sh" WEB-001 API-001 WEB-003 CAP-001 >/dev/null )
+  ( cd "$vtdir/.." && VT_DIR="$vtdir" VT_ALLOW_TODAY_FIRST=1 bash "$PLUGIN_SCRIPTS/vt-today.sh" WEB-001 API-001 CAP-002 >/dev/null )
+  perl -pi -e "s/^## Week \d+ /## Week $lw /" "$vtdir/current-priorities.md"
   perl -pi -e "s/^## Today \(\d{4}-\d{2}-\d{2}\)/## Today ($d_yest)/" "$vtdir/current-priorities.md"
   perl -pi -e "s/^\d{4}-\d{2}-\d{2}(T\S+\ttoday\t)/${d_yest}\$1/" "$vtdir/priorities.log"
+  d_lw=$(date -v-7d +%F 2>/dev/null || date -d '7 days ago' +%F)
+  perl -pi -e "s/^\d{4}-\d{2}-\d{2}(T\S+\tweek\t)/${d_lw}\$1/" "$vtdir/priorities.log"
   rm -rf "$vtdir/.cleared"; mkdir -p "$vtdir/.cleared"   # stale focus + armed = gate active on launch
+}
+
+# The Real C accept walk (Packet 005 dogfood) — printed for `demo c` INSTEAD of the beta A/B
+# walks, and written into the workspace as DOGFOOD-REAL-C.md so it's visible in the session cwd.
+REALC_RUNBOOK="$HOME/Ship/bls/stories/vibe-table/16-v2.5-orientation-loop/tracks/C-prioritize.md"
+realc_walk() {  # → stdout (markdown-ish plain text)
+  local d_yest lw
+  d_yest=$(date -v-1d +%F 2>/dev/null || date -d 'yesterday' +%F)
+  lw=$(date -v-7d +%V 2>/dev/null || date -d '7 days ago' +%V)
+  cat <<EOF
+# Real C accept walk — Packet 005 dogfood (v2.5 living priorities)
+
+This sandbox is ALREADY CONFIGURED. Skip /4loops:configure, skip virgin onboarding, skip the
+Track A/B beta arcs. Evaluate the Real C accept path only:
+
+  Seeded: mid-week board (WEB-*, API-*) · store CAP-001..005 (urgent / today / later, one due this
+  week) · a PRIOR Week (Week ${lw}) with anchors WEB-001 API-001 WEB-003 CAP-001 · yesterday's
+  (${d_yest}) Today focus WEB-001 API-001 CAP-002. Both stamps are stale ⇒ the gate is ACTIVE.
+
+  1. Ask Claude to edit web-app/src/components/Dashboard.jsx → DENIED with the ORIENTATION copy
+     ("orientation stale … no state moves are required"). No "move something on the board" nudge.
+  2. /4loops:week  → ONE orientation print, no board dump. WEEK→WEEK CARRY: "Last Week (Week ${lw})
+     anchors — still alive" lists the prior anchors that are still live (WEB-001, API-001, WEB-003,
+     CAP-001); anything finished/retired/expired is called out under honest endings. Then the
+     committed board work and the store pull (urgent · today · due this week). Keep or edit 3–5;
+     free text is allowed and lands in the store.
+  3. /4loops:today → DAY CARRY: "Last Today (${d_yest})" still-alive focus (WEB-001, API-001, CAP-002)
+     + store pull (CAP-001 urgent leads) + "how today meets the week" marks. Commit 1–3; the gate
+     lifts. Step 3 of the skill is an OPTIONAL light state check on focus stories only.
+  4. /4loops:prioritize add "some new thing"  → lands in the store (lever=today) AND in Today, no
+     capture→promote detour. Try 'drop <ID>' too (CAP goes back to later, logged).
+  5. Ask "what did we do yesterday?" (via /4loops:sync) → vt-today.sh --yesterday: last Today's
+     focus + that day's board/store transitions, derived from logs — no per-day archive.
+  6. Optional: cat .4loops/current-priorities.md and .4loops/priorities.log (living doc + history).
+
+  ACCEPT = 1–5 feel like orientation (last week → this week, yesterday → today), not board
+  reconciliation; board.md is untouched unless YOU chose a state move in step 3.
+
+Story runbook: ${REALC_RUNBOOK}
+EOF
 }
 
 write_settings() {  # <config-dir> — injection settings (directory-source marketplace)
@@ -305,7 +357,8 @@ cmd_new() {
 # No dependency on any prior workspace — run it any time, even right after `prune`.
 #   sandbox.sh demo a   → Track A (empty: install → /configure → …)
 #   sandbox.sh demo b   → Track B (seeded mid-week, fresh ISO week)
-#   sandbox.sh demo c   → v2.5 Real C (b + store levers + yesterday's Today focus)
+#   sandbox.sh demo c   → v2.5 Real C (b + store levers + prior Week + yesterday's Today; prints the
+#                          Real C accept walk, not the beta A/B walks; writes DOGFOOD-REAL-C.md)
 #   sandbox.sh demo <a|b|c> --no-launch   → just build + print the launch command
 cmd_demo() {
   local track="${1:-}" launch=1 bypass=0 ts seed root ws
@@ -318,7 +371,7 @@ cmd_demo() {
     a|A|fresh|empty)    EMPTY=true;  seed=fresh ;;
     b|B|seeded|midweek) EMPTY=false; seed=midweek ;;
     c|C|realc|store)    EMPTY=false; seed=realc ;;
-    *) die "usage: sandbox demo <a|b|c> [--no-launch]  (a = empty/onboarding, b = seeded board, c = seeded board + store + yesterday focus)" ;;
+    *) die "usage: sandbox demo <a|b|c> [--no-launch]  (a = empty/onboarding, b = seeded board, c = Real C: seeded board + store + prior week + yesterday focus)" ;;
   esac
   MODE=light; INSTALL=""
   ts=$(date +%Y%m%d-%H%M%S)
@@ -327,9 +380,16 @@ cmd_demo() {
   mkdir -p "$ws"
   scaffold_mock "$ws"
   [ "$EMPTY" = false ] && seed_board "$ws/.4loops"
-  [ "$seed" = realc ] && seed_store "$ws/.4loops"
+  if [ "$seed" = realc ]; then
+    seed_store "$ws/.4loops"
+    realc_walk > "$ws/DOGFOOD-REAL-C.md"
+  fi
   write_meta "$root"
   echo "✓ fresh sandbox '$NAME'  ($root)" >&2
+  if [ "$seed" = realc ]; then
+    echo >&2; realc_walk >&2; echo >&2
+    echo "  (this walk is also at $ws/DOGFOOD-REAL-C.md)" >&2
+  fi
   if [ "$launch" = 1 ]; then
     if [ "$bypass" = 1 ]; then
       echo "  launching in BYPASS mode (VT_ALLOW_STALE_GATE=1) — the gate is OFF this whole session…" >&2

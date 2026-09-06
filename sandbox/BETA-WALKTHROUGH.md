@@ -22,6 +22,7 @@ uniquely-named* sandbox and drops you straight into a Claude session with the pl
 ```bash
 bash ~/Ship/bls/projects/p0-vibe-table/vibe-table/sandbox/sandbox.sh demo a   # Track A (onboarding)
 bash ~/Ship/bls/projects/p0-vibe-table/vibe-table/sandbox/sandbox.sh demo b   # Track B (mid-week)
+bash …/sandbox/sandbox.sh demo c   # Track C — Real C living priorities (Packet 005 dogfood; see below)
 ```
 
 Run it any time — even right after `prune`. Each run is a brand-new workspace (timestamped), so you
@@ -128,6 +129,22 @@ It can't fake it (every move runs a rail + re-renders from disk; the gate blocks
 Does `/nav` ever mis-map or invent — or does it stay honest?
 
 ---
+
+## Track C — Real C living priorities (Packet 005 dogfood, not the beta arc)  ·  `demo c`
+
+```bash
+bash ~/Ship/bls/projects/p0-vibe-table/vibe-table-wt-track-a-capture/sandbox/sandbox.sh demo c
+```
+
+`demo c` is **not** a third beta arc. It builds Track B's seeded board **plus** a detached store
+(CAP-001..005 with `urgent` / `today` / `later` levers, one due this week), a **prior Week** with
+anchors backdated to last ISO week, and **yesterday's Today** focus — both stamps stale, so the gate is
+active and both `/4loops:week` and `/4loops:today` open on **carry-forward** (week carries like day).
+The sandbox is already configured: skip `/4loops:configure` and the A/B walks. The accept walk is
+printed at build time and written to `workspace/DOGFOOD-REAL-C.md`; the runbook is the story's
+`tracks/C-prioritize.md`. Six steps: gated edit → orientation deny copy · `/4loops:week` (week→week
+carry) · `/4loops:today` (day carry + store pull) · `/4loops:prioritize add "…"` · yesterday via
+`/4loops:sync` · cat the living doc.
 
 ## Bypassing the lock — the break-glass (yours alone)
 

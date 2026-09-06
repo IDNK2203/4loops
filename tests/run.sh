@@ -751,7 +751,7 @@ ck "today set: free text → store item, lever=today"    'grep -q "^lever=today$
 ck "today set: focus line + titled items"              'grep -q "^Focus: CAP-001 · CAP-006$" "$VT_DIR/current-priorities.md" && grep -q "^- CAP-006  Fix login bug  \[store·today\]$" "$VT_DIR/current-priorities.md"'
 ck "today set: committed CAP urgent → today"           'grep -q "^lever=today$" "$VT_DIR/store/items/CAP-001"'
 ck "today set: left-out today item → later (logged)"   'grep -q "^lever=later$" "$VT_DIR/store/items/CAP-002" && grep -q "CAP-002 | lever:today → lever:later | dropped-from-today" "$VT_DIR/store/transitions.log"'
-ck "today set: gate clear (today + week fresh)"        '! bash -c "cd \"$W26\" && source \"$S/vt-guard-lib.sh\" && vt_gate_active"'
+ck "today set: gate clear (today + week fresh)"        '! bash -c "cd \"$W26\" && source \"$S/vt-priorities-lib.sh\" && vt_gate_active"'
 # mid-day direct add / drop / week add
 bash "$S/vt-priority.sh" add "Mid-day surprise" >/tmp/vt26-add.txt 2>&1
 ck "priority add: free text → CAP lever=today, in focus"  'grep -q "^lever=today$" "$VT_DIR/store/items/CAP-007" && grep -q "^Focus: CAP-001 · CAP-006 · CAP-007$" "$VT_DIR/current-priorities.md"'
@@ -769,6 +769,18 @@ ck "priority since: store items landed since stamp"       'printf "%s" "$SINCE" 
 # carry-forward: expire a focus CAP → dropped from carry; still-alive stays the default
 bash "$S/vt-store-expire.sh" --force-expire CAP-006 >/dev/null
 ck "carry-forward: expired CAP leaves the default"        '[ "$(bash "$S/vt-today.sh" --default)" = "CAP-007 CAP-008" ]'
+# week carries like day: still-alive last-week anchors first, expired ones drop; then board + store pull
+bash "$S/vt-store-expire.sh" --force-expire CAP-005 >/dev/null     # week-only anchor, now expired
+ck "week carry: default = alive anchors + board + store pull"  '[ "$(bash "$S/vt-week.sh" --default)" = "P0-001 CAP-001 CAP-002 CAP-007 CAP-008 CAP-003" ]'
+LW=$(date -v-7d +%V 2>/dev/null || date -d "7 days ago" +%V)
+perl -pi -e "s/^## Week \d+ /## Week $LW /" "$VT_DIR/current-priorities.md"   # simulate: last week's stamp
+WO2=$(bash "$S/vt-week.sh" --orient)
+ck "week --orient (new week): last week's alive anchors carry"  'printf "%s" "$WO2" | grep -q "^Last Week (Week '"$LW"') anchors — still alive:$" && printf "%s" "$WO2" | grep -q "P0-001  Board story  \[in-progress\]"'
+ck "week --orient (new week): expired anchor = honest ending"   'printf "%s" "$WO2" | grep -q "finished / retired / expired (honest endings):" && printf "%s" "$WO2" | grep -q "CAP-005  New week anchor  \[store·expired\]"'
+ck "week --orient (new week): header says new week"             'printf "%s" "$WO2" | grep -q "last stamp Week '"$LW"' — new week"'
+ck "stale week: gate active again"                              'bash -c "cd \"$W26\" && source \"$S/vt-priorities-lib.sh\" && vt_gate_active"'
+bash "$S/vt-week.sh" P0-001 CAP-001 CAP-002 >/dev/null 2>&1        # re-anchor → week fresh, today still fresh → clear
+ck "re-anchored week: gate clear"                               '! bash -c "cd \"$W26\" && source \"$S/vt-priorities-lib.sh\" && vt_gate_active"'
 TO2=$(bash "$S/vt-today.sh" --orient)
 ck "today --orient: dropped shows honest ending"          'printf "%s" "$TO2" | grep -q "dropped (done / retired / expired):" && printf "%s" "$TO2" | grep -q "CAP-006  Fix login bug  \[store·expired\]"'
 ck "today --orient: fresh stamp = re-orienting mid-day"   'printf "%s" "$TO2" | grep -q "(fresh — re-orienting mid-day)"'
