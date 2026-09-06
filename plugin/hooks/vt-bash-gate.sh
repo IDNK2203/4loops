@@ -54,7 +54,7 @@ if [ -n "$caprails" ] && [ "$rail_override" = "0" ]; then
       cap=$(vt_read_cap "$sid")
       while IFS= read -r rname; do
         [ -z "$rname" ] && continue
-        vt_cap_allows "$cap" "$(vt_rail_tier "$rname")" || vt_emit_deny "$(vt_cap_deny_reason)"
+        vt_cap_allows "$cap" "$(vt_rail_tier_for "$rname" "$cmd")" || vt_emit_deny "$(vt_cap_deny_reason)"
       done <<EOF
 $caprails
 EOF

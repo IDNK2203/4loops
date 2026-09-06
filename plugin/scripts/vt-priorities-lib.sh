@@ -9,6 +9,14 @@ VT_DIR="${VT_DIR:-./.4loops}"
 BOARD="$VT_DIR/board.md"
 PRIORITIES="$VT_DIR/current-priorities.md"
 TRANSITIONS="$VT_DIR/transitions.log"
+# v2.5 Real C: append-only focus history (one line per Today/Week commit). This
+# is the "history via transitions" for priorities — NOT a per-day archive file.
+PRIORITIES_LOG="$VT_DIR/priorities.log"
+
+# v2.5 Real C: focus lines may hold detached-store items (CAP-NNN) next to board
+# stories, so the priorities lib needs the store helpers.
+# shellcheck source=./vt-store-lib.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/vt-store-lib.sh"
 
 # Date helpers (BSD/macOS-compatible)
 iso_today()      { date +"%Y-%m-%d"; }
@@ -51,6 +59,12 @@ _week_back() {
 week_start_date() {
   local back; back=$(_week_back)
   date -v-"${back}"d +"%Y-%m-%d" 2>/dev/null || date -d "today -${back} days" +"%Y-%m-%d"
+}
+
+# Date (YYYY-MM-DD) of the last day of the current week, honoring week-start.
+week_end_date() {
+  local back; back=$(_week_back)
+  date -v-"${back}"d -v+6d +"%Y-%m-%d" 2>/dev/null || date -d "today -${back} days +6 days" +"%Y-%m-%d"
 }
 
 # Week-of-year number for the CURRENT week, honoring week-start. Mon routes
@@ -275,38 +289,223 @@ read_focus() {
   ' "$PRIORITIES"
 }
 
-# Compute carry-forward default for either today or week.
-# Default = IDs from previous focus whose current state is in {planning, in-progress, testing}.
-# If no previous focus (or no priorities file), default = all stories currently in in-progress.
-compute_carry_forward() {
-  local section="$1"
-  local prev_ids
-  prev_ids=$(read_focus "$section")
-  if [ -z "$prev_ids" ]; then
-    # No previous focus: surface what's currently in-progress as a starting point.
-    awk -F'|' '
-      /^\| Backlog \| Planning \| In Progress \| Testing \| Done \|$/ { in_kanban = 1; next }
-      in_kanban && /^\| --/ { in_body = 1; next }
-      in_body && /^\|/ {
-        cell = $4   # In Progress column
-        gsub(/^ +| +$/, "", cell)
-        if (cell != "" && match(cell, /\*\*[A-Z0-9]+-[0-9]+\*\*/)) {
-          print substr(cell, RSTART+2, RLENGTH-4)
-        }
+# ── v2.5 Real C: store-aware focus items ─────────────────────────────────────
+# A focus line holds board stories (P0-NNN) AND detached-store items (CAP-NNN).
+# These helpers give every focus ID a title / state / liveness regardless of
+# which record backs it, so the priorities doc can be the main surface.
+
+vt_is_cap_id() { case "$1" in CAP-[0-9]*) return 0 ;; *) return 1 ;; esac; }
+
+# Board story IDs in the given columns (space-separated names), in grid order.
+board_ids_in() {
+  local want=" $* "
+  [ -f "$BOARD" ] || return 0
+  awk -F'|' -v want="$want" '
+    BEGIN { names[2]="backlog"; names[3]="planning"; names[4]="in-progress"; names[5]="testing"; names[6]="done" }
+    /^\| Backlog \| Planning \| In Progress \| Testing \| Done \|$/ { in_kanban = 1; next }
+    in_kanban && /^\| --/ { in_body = 1; next }
+    in_body && /^\|/ {
+      for (i = 2; i <= 6; i++) {
+        if (index(want, " " names[i] " ") == 0) continue
+        cell = $i; gsub(/^ +| +$/, "", cell)
+        if (cell != "" && match(cell, /\*\*[A-Z0-9]+-[0-9]+\*\*/)) print substr(cell, RSTART+2, RLENGTH-4)
       }
-    ' "$BOARD" 2>/dev/null | tr '\n' ' ' | sed 's/ *$//'
-    return
+    }
+  ' "$BOARD" 2>/dev/null
+}
+
+# Title for any focus ID (store title for CAP, board title otherwise).
+focus_title() {
+  local id="$1" p
+  if vt_is_cap_id "$id"; then
+    p=$(vt_store_item_path "$id")
+    [ -f "$p" ] && vt_store_get "$p" title
+  else
+    story_title "$id"
   fi
-  # Filter previous focus: keep IDs currently in planning/in-progress/testing
-  local result=""
-  for id in $prev_ids; do
-    local s
-    s=$(story_state "$id")
-    case "$s" in
-      planning|in-progress|testing) result="${result}${id} " ;;
+}
+
+# Short state tag for any focus ID:
+#   board → backlog|planning|in-progress|testing|done|off-board
+#   store → store·<lever> (live) | store·expired | store·cleared | store·missing
+focus_state() {
+  local id="$1" p st
+  if vt_is_cap_id "$id"; then
+    p=$(vt_store_item_path "$id")
+    [ -f "$p" ] || { echo "store·missing"; return; }
+    st=$(vt_store_get "$p" state)
+    case "$st" in
+      captured|active) echo "store·$(vt_store_get_lever "$p")" ;;
+      *) echo "store·${st:-missing}" ;;
     esac
+  else
+    st=$(story_state "$id"); echo "${st:-off-board}"
+  fi
+}
+
+# 0 iff the item is still alive work: a board story in planning/in-progress/
+# testing, or a live (captured|active) store item. Done / archived / expired /
+# cleared / backlog all count as "not alive" for carry-forward purposes.
+focus_alive() {
+  case "$(focus_state "$1")" in
+    planning|in-progress|testing|store·urgent|store·today|store·later) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+# Live store IDs with a given lever, in ID order.
+store_ids_by_lever() {
+  local want="$1" d f st
+  d=$(vt_store_dir)
+  [ -d "$d/items" ] || return 0
+  for f in "$d"/items/CAP-*; do
+    [ -f "$f" ] || continue
+    st=$(vt_store_get "$f" state)
+    case "$st" in captured|active) ;; *) continue ;; esac
+    [ "$(vt_store_get_lever "$f")" = "$want" ] && basename "$f"
   done
-  echo "$result" | sed 's/ *$//'
+}
+
+# Live store IDs whose deadline falls on/before <date> (YYYY-MM-DD), in ID order.
+store_ids_due_by() {
+  local by="$1" d f st due
+  d=$(vt_store_dir)
+  [ -d "$d/items" ] || return 0
+  for f in "$d"/items/CAP-*; do
+    [ -f "$f" ] || continue
+    st=$(vt_store_get "$f" state)
+    case "$st" in captured|active) ;; *) continue ;; esac
+    due=$(vt_store_get "$f" deadline)
+    [ -n "$due" ] || continue
+    if [[ "$due" < "$by" || "$due" == "$by" ]]; then basename "$f"; fi
+  done
+}
+
+# Append IDs to a space-separated list, skipping duplicates. Echoes the new list.
+_merge_ids() {
+  local list="$1"; shift
+  local id
+  for id in "$@"; do
+    [ -z "$id" ] && continue
+    case " $list " in *" $id "*) ;; *) list="${list:+$list }$id" ;; esac
+  done
+  printf '%s' "$list"
+}
+
+# Carry-forward for either section: previous focus IDs that are still alive
+# (board planning/in-progress/testing, or live store items). This is "yesterday's
+# still-alive focus" — the default that /today continues from.
+compute_carry_forward() {
+  local section="$1" prev_ids result="" id
+  prev_ids=$(read_focus "$section")
+  for id in $prev_ids; do
+    focus_alive "$id" && result=$(_merge_ids "$result" "$id")
+  done
+  printf '%s' "$result"
+}
+
+# Suggested Today focus (v2.5 Real C): yesterday carry-forward first, then the
+# store pull — urgent levers, then today levers. Board Backlog is NOT a source.
+# With no previous focus at all, falls back to board in-progress work so a
+# first run still has a starting point.
+suggest_today() {
+  local s
+  s=$(compute_carry_forward today)
+  if [ -z "$s" ] && [ -z "$(read_focus today)" ]; then
+    s=$(_merge_ids "" $(board_ids_in in-progress))
+  fi
+  s=$(_merge_ids "$s" $(store_ids_by_lever urgent))
+  s=$(_merge_ids "$s" $(store_ids_by_lever today))
+  printf '%s' "$s"
+}
+
+# Suggested Week anchors: last week's still-alive anchors, then committed board
+# work (in-progress + testing), then the store pull (urgent, today, and later
+# items due by the end of this week).
+suggest_week() {
+  local s
+  s=$(compute_carry_forward week)
+  s=$(_merge_ids "$s" $(board_ids_in in-progress testing))
+  s=$(_merge_ids "$s" $(store_ids_by_lever urgent))
+  s=$(_merge_ids "$s" $(store_ids_by_lever today))
+  s=$(_merge_ids "$s" $(store_ids_due_by "$(week_end_date)"))
+  printf '%s' "$s"
+}
+
+# Keep store levers coherent with the committed Today focus: a live CAP in
+# focus becomes lever=today (urgent absorbed into the day; later pulled in); a
+# live CAP that was lever=today but is no longer in focus goes back to later
+# (an honest park, logged in store/transitions.log — history, not deletion).
+# Board stories are untouched: the board is a state check, not the planning pen.
+sync_store_levers_today() {
+  local focus=" $1 " id lev
+  for id in $(store_ids_by_lever urgent) $(store_ids_by_lever later); do
+    case "$focus" in *" $id "*) vt_store_set_lever "$id" today "today-focus" ;; esac
+  done
+  for id in $(store_ids_by_lever today); do
+    case "$focus" in *" $id "*) ;; *) vt_store_set_lever "$id" later "dropped-from-today" ;; esac
+  done
+}
+
+# Default project key for a direct-add store item: first Projects row on the
+# board, else GEN.
+default_project_key() {
+  local k=""
+  [ -f "$BOARD" ] && k=$(awk -F'|' '
+    /^## Projects/ { p = 1; next }
+    /^---$/        { p = 0 }
+    p && /^\| ---/ { h = 1; next }
+    p && h && /^\|/ { c = $2; gsub(/^ +| +$/, "", c); if (c != "") { print c; exit } }
+  ' "$BOARD")
+  printf '%s' "${k:-GEN}"
+}
+
+# Resolve mixed args into focus IDs. Tokens shaped like an ID (P0-12, CAP-003)
+# pass through (unknown IDs warn, but are kept — the operator decides). Anything
+# else is FREE TEXT: a new store item is created on the spot (state active,
+# lever = today for the today section, later for week) so mid-day work lands in
+# priorities without a separate capture step. Echoes the space-separated IDs;
+# creation notices go to stderr.  $1 = today|week, $2 = project key (may be
+# empty → default), rest = tokens.
+resolve_focus_tokens() {
+  local section="$1" proj="$2"; shift 2
+  local out="" tok id lever
+  [ "$section" = today ] && lever=today || lever=later
+  [ -z "$proj" ] && proj=$(default_project_key)
+  for tok in "$@"; do
+    [ -z "$tok" ] && continue
+    if [[ "$tok" =~ ^[A-Z][A-Z0-9]*-[0-9]+$ ]]; then
+      case "$(focus_state "$tok")" in
+        off-board|store·missing) echo "warn: $tok is not on the board or in the store (kept as typed)." >&2 ;;
+      esac
+      out=$(_merge_ids "$out" "$tok")
+    else
+      vt_store_ensure
+      id=$( STORE_PROJECT="$proj"; STORE_TITLE="$tok"; STORE_TYPE=dev; STORE_WHY="direct-add:$section"
+            STORE_DEADLINE=""; STORE_LEVER="$lever"; vt_store_write_new )
+      vt_store_transition "$id" active "direct-add" >/dev/null
+      echo "added: $id [$proj] $tok  (store, lever=$lever)" >&2
+      out=$(_merge_ids "$out" "$id")
+    fi
+  done
+  printf '%s' "$out"
+}
+
+# Append one line to priorities.log: <ts>\t<section>\t<ids>\t<reason>
+log_priorities() {
+  local section="$1" ids="$2" reason="${3:-set}" ts
+  ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+  printf '%s\t%s\t%s\t%s\n' "$ts" "$section" "${ids:--}" "$reason" >> "$PRIORITIES_LOG" 2>/dev/null || true
+}
+
+# Titled focus bullets for a section body: "- ID  title  [state]".
+render_focus_items() {
+  local ids="$1" id t
+  for id in $ids; do
+    [ -z "$id" ] && continue
+    t=$(focus_title "$id")
+    printf -- '- %s  %s  [%s]\n' "$id" "${t:-?}" "$(focus_state "$id")"
+  done
 }
 
 # Compute activity slice lines for a window.
@@ -380,6 +579,7 @@ render_today_section() {
   fi
   echo "## Today (${stamp})"
   echo "Focus: ${focus_display}"
+  [ -n "$focus" ] && render_focus_items "$focus"
   echo ""
   echo "In progress today:"
   activity_lines today in-progress "$focus"
@@ -405,6 +605,7 @@ render_week_section() {
   fi
   echo "## Week ${week_num} (${week_range})"
   echo "Focus: ${focus_display}"
+  [ -n "$focus" ] && render_focus_items "$focus"
   echo ""
   echo "In progress this week:"
   activity_lines week in-progress "$focus"
@@ -437,9 +638,10 @@ write_priorities() {
 # PRESERVING the other section's existing stamp (empty stays empty = stale).
 # This is what makes each ritual own its own gate: /4loops:today freshens only Today
 # (the week gate is untouched) and /4loops:week freshens only Week (the day gate
-# stays active until /4loops:today also runs). Args: which=today|week, new_focus.
+# stays active until /4loops:today also runs). Args: which=today|week, new_focus,
+# [reason] (logged to priorities.log — the focus history; default "set").
 write_focus_section() {
-  local which="$1" new_focus="$2" workspace
+  local which="$1" new_focus="$2" reason="${3:-set}" workspace
   workspace=$(basename "$(pwd)")
   local today_focus today_stamp week_focus week_stamp
   today_focus=$(read_focus today); today_stamp=$(read_today_stamp)
@@ -458,6 +660,7 @@ write_focus_section() {
     echo ""
     render_week_section "$week_focus" "$week_stamp"       # explicit stamp (may be empty = stale)
   } > "$PRIORITIES"
+  log_priorities "$which" "$new_focus" "$reason"
 }
 
 # Refresh ONLY activity slices in current-priorities.md, preserving existing
@@ -518,9 +721,10 @@ vt_gate_active() {
   return 1
 }
 
-# Emit "  <ID>  <title>" indented lines for a section's focus IDs (today|week),
-# or a single "  (none set)" line. Used by the sentinel dashboard render so the
-# user sees the actual tasks, not bare IDs.
+# Emit "  <ID>  <title>  [state]" indented lines for a section's focus IDs
+# (today|week), or a single "  (none set)" line. Used by the sentinel dashboard
+# render so the user sees the actual tasks, not bare IDs. Store items (CAP)
+# render with their store title + lever.
 render_focus_lines() {
   local section="$1" ids id t
   ids=$(read_focus "$section")
@@ -530,7 +734,127 @@ render_focus_lines() {
   fi
   for id in $ids; do
     [ -z "$id" ] && continue
-    t=$(story_title "$id")
-    if [ -n "$t" ]; then echo "  ${id}  ${t}"; else echo "  ${id}"; fi
+    t=$(focus_title "$id")
+    if [ -n "$t" ]; then echo "  ${id}  ${t}  [$(focus_state "$id")]"; else echo "  ${id}  [$(focus_state "$id")]"; fi
   done
+}
+
+# ── v2.5 Real C: orientation renders ─────────────────────────────────────────
+# "  ID  title  [state]" lines for an ID list, or "  (none)".
+_orient_lines() {
+  local ids="$1" id t
+  [ -z "$ids" ] && { echo "  (none)"; return 0; }
+  for id in $ids; do
+    [ -z "$id" ] && continue
+    t=$(focus_title "$id")
+    printf '  %s  %s  [%s]\n' "$id" "${t:-?}" "$(focus_state "$id")"
+  done
+}
+
+# The /today orientation block: where you are vs yesterday's carry-forward and
+# the week's anchors, plus the store pull. Ends with a SUGGESTED_FOCUS line the
+# skill reads. No board print — the board is a state check, not the planning pen.
+render_today_orient() {
+  local today stamp wk wk_stamp wk_state carry prev dropped id sugg n_later
+  today=$(iso_today); stamp=$(read_today_stamp)
+  wk=$(week_num_current); wk_stamp=$(read_week_stamp)
+  if week_stamp_current "$wk_stamp"; then wk_state="current"; else wk_state="STALE — run /4loops:week first"; fi
+  prev=$(read_focus today); carry=$(compute_carry_forward today)
+  echo "Orientation · Today ${today} · Week ${wk} (${wk_state})"
+  if [ -z "$stamp" ]; then echo "Today stamp: none (first run)"
+  elif [ "$stamp" = "$today" ]; then echo "Today stamp: ${stamp} (fresh — re-orienting mid-day)"
+  else echo "Today stamp: ${stamp} (stale)"; fi
+  echo ""
+  echo "Last Today${stamp:+ (${stamp})} — carry-forward (still alive):"
+  _orient_lines "$carry"
+  dropped=""
+  for id in $prev; do case " $carry " in *" $id "*) ;; *) dropped="${dropped:+$dropped }$id" ;; esac; done
+  if [ -n "$dropped" ]; then
+    echo "  dropped (done / retired / expired):"
+    _orient_lines "$dropped" | sed 's/^/  /'
+  fi
+  echo ""
+  echo "Store pull:"
+  echo "  urgent:"; _orient_lines "$(_merge_ids "" $(store_ids_by_lever urgent))" | sed 's/^/  /'
+  echo "  today:";  _orient_lines "$(_merge_ids "" $(store_ids_by_lever today))"  | sed 's/^/  /'
+  n_later=$(store_ids_by_lever later | wc -l | tr -d ' ')
+  echo "  later: ${n_later} parked (pull with /4loops:prioritize, or name them when you set today)"
+  echo ""
+  sugg=$(suggest_today)
+  echo "Week ${wk} anchors — how today meets the week:"
+  local wk_ids; wk_ids=$(read_focus week)
+  if [ -z "$wk_ids" ]; then echo "  (none set)"; else
+    for id in $wk_ids; do
+      local mark="" t
+      case " $sugg " in *" $id "*) mark="  ← in suggested today" ;; esac
+      t=$(focus_title "$id")
+      printf '  %s  %s  [%s]%s\n' "$id" "${t:-?}" "$(focus_state "$id")" "$mark"
+    done
+  fi
+  echo ""
+  echo "SUGGESTED_FOCUS: ${sugg:-—}"
+}
+
+# The /week orientation block: last week's anchors (alive vs finished), the
+# committed board work, and the store pull. Ends with SUGGESTED_FOCUS.
+render_week_orient() {
+  local wk wk_stamp wk_state prev carry dropped id sugg n_later
+  wk=$(week_num_current); wk_stamp=$(read_week_stamp)
+  if week_stamp_current "$wk_stamp"; then wk_state="fresh — re-orienting mid-week"; else wk_state="${wk_stamp:+last stamp Week ${wk_stamp} — }new week"; fi
+  prev=$(read_focus week); carry=$(compute_carry_forward week)
+  echo "Orientation · Week ${wk} ($(iso_week_range)) · ${wk_state}"
+  echo ""
+  echo "Last Week${wk_stamp:+ (Week ${wk_stamp})} anchors — still alive:"
+  _orient_lines "$carry"
+  dropped=""
+  for id in $prev; do case " $carry " in *" $id "*) ;; *) dropped="${dropped:+$dropped }$id" ;; esac; done
+  if [ -n "$dropped" ]; then
+    echo "  finished / retired / expired (honest endings):"
+    _orient_lines "$dropped" | sed 's/^/  /'
+  fi
+  echo ""
+  echo "Committed board work (in-progress · testing):"
+  _orient_lines "$(_merge_ids "" $(board_ids_in in-progress testing))"
+  echo ""
+  echo "Store pull:"
+  echo "  urgent:"; _orient_lines "$(_merge_ids "" $(store_ids_by_lever urgent))" | sed 's/^/  /'
+  echo "  today:";  _orient_lines "$(_merge_ids "" $(store_ids_by_lever today))"  | sed 's/^/  /'
+  echo "  due this week (later):"; _orient_lines "$(_merge_ids "" $(store_ids_due_by "$(week_end_date)"))" | sed 's/^/  /'
+  n_later=$(store_ids_by_lever later | wc -l | tr -d ' ')
+  echo "  later: ${n_later} parked"
+  echo ""
+  sugg=$(suggest_week)
+  echo "SUGGESTED_FOCUS: ${sugg:-—}"
+}
+
+# "What did we do yesterday?" — derived from transitions, not an archive:
+# the last Today commit before today (priorities.log, falling back to the
+# current file's stale stamp), board transitions on that date, and store
+# transitions on that date.
+render_yesterday() {
+  local today date ids line
+  today=$(iso_today)
+  if [ -f "$PRIORITIES_LOG" ]; then
+    line=$(awk -F'\t' -v t="$today" '$2=="today" && substr($1,1,10) < t {l=$0} END{print l}' "$PRIORITIES_LOG")
+  fi
+  if [ -n "${line:-}" ]; then
+    date=$(printf '%s' "$line" | cut -f1 | cut -c1-10); ids=$(printf '%s' "$line" | cut -f3)
+    [ "$ids" = "-" ] && ids=""
+  else
+    date=$(read_today_stamp)
+    [ -n "$date" ] && [ "$date" != "$today" ] && ids=$(read_focus today) || { date=""; ids=""; }
+  fi
+  if [ -z "$date" ]; then echo "No earlier Today focus on record yet."; return 0; fi
+  echo "Last Today (${date}) focus:"
+  _orient_lines "$ids"
+  echo ""
+  echo "Board transitions on ${date}:"
+  if [ -f "$TRANSITIONS" ]; then
+    awk -F'\t' -v d="$date" 'substr($1,1,10)==d {printf "  %s  %s\n", $2, $3}' "$TRANSITIONS" | { grep . || echo "  (none)"; }
+  else echo "  (none)"; fi
+  echo ""
+  echo "Store transitions on ${date}:"
+  if [ -f "$(vt_store_dir)/transitions.log" ]; then
+    awk -v d="$date" 'substr($1,1,10)==d {sub(/^[^|]*\| /, ""); print "  " $0}' "$(vt_store_dir)/transitions.log" | { grep . || echo "  (none)"; }
+  else echo "  (none)"; fi
 }

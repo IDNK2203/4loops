@@ -239,6 +239,27 @@ vt_rail_tier() {
   esac
 }
 
+# Tier for a rail AS INVOKED: the gate-clearing rituals have read-only modes
+# (--orient / --default / --current / --yesterday) that other operator commands
+# (/sync, /prioritize, /week) legitimately call to orient — those are never
+# gated. Any other invocation keeps the script's tier. $1 = rail name, $2 = the
+# full command string.
+vt_rail_tier_for() {
+  local rname="$1" cmd="$2" total ro
+  case "$rname" in
+    vt-today|vt-week)
+      # Every mention of the script in the command must be a read-only mode —
+      # a chained `--orient; vt-today.sh P0-1` must NOT ride the read-only pass.
+      total=$(printf '%s\n' "$cmd" | grep -oE "${rname}\.sh" | wc -l | tr -d ' ')
+      ro=$(printf '%s\n' "$cmd" | grep -oE "${rname}\.sh\"?[[:space:]]+--(orient|default|current|yesterday)" | wc -l | tr -d ' ')
+      if [ "${total:-0}" -gt 0 ] && [ "$total" -eq "${ro:-0}" ]; then
+        printf 'readonly'; return 0
+      fi
+      ;;
+  esac
+  vt_rail_tier "$rname"
+}
+
 # Does this session's capability (bare cmd) cover the rail's tier?
 vt_cap_allows() {
   local cap="$1" tier="$2"
@@ -274,11 +295,11 @@ vt_log_override() {
 vt_gate_directive() {
   local lead
   if ! week_stamp_current "$(read_week_stamp)"; then
-    lead="It's a new week — run /4loops:week, then /4loops:today, to reconcile the board and set focus."
+    lead="It's a new week — run /4loops:week (set this week's anchors from what's still alive + the store), then /4loops:today."
   else
-    lead="Today's focus is stale — run /4loops:today to reconcile the board and set today's focus."
+    lead="Today's focus is stale — run /4loops:today to face yesterday's carry-forward and the week's anchors, and set today's 1–3."
   fi
-  printf '%s' "4loops gate (focus stale). ${lead} STOP here — do NOT edit this gated surface, and do NOT work around the gate yourself (no override, no shelling out, no alternate tool). You cannot reconcile for the user: the rituals are user-invoked by design. Surface this, ask them to run the command above, and wait — that reconciliation IS their priority-setting and it lifts the gate. Reading, search, and notes (.4loops/, study/, learnings/, inbox/) are never blocked, so do whatever non-gated work you can meanwhile. Bypassing is the USER's decision alone — only if THEY explicitly tell you to (it's logged)."
+  printf '%s' "4loops gate (orientation stale). ${lead} This is orientation, not board churn: no state moves are required to lift it. STOP here — do NOT edit this gated surface, and do NOT work around the gate yourself (no override, no shelling out, no alternate tool). You cannot orient for the user: the rituals are user-invoked by design. Surface this, ask them to run the command above, and wait — that orientation IS their priority-setting and it lifts the gate. Reading, search, and notes (.4loops/, study/, learnings/, inbox/) are never blocked, so do whatever non-gated work you can meanwhile. Bypassing is the USER's decision alone — only if THEY explicitly tell you to (it's logged)."
 }
 
 # Emit a PreToolUse deny. Canonical = exit 0 + hookSpecificOutput JSON; falls

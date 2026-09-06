@@ -433,18 +433,20 @@ ck "drift line: surfaces due-soon"         'printf "%s" "$DR" | grep -q "due-soo
 unset VT_DIR
 
 echo
-echo "════ 17. Reconciliation contract — see-then-pick, structured (W9/W10, v2) ════"
-ck "today: see-the-board-then-pick (not chat)"  'grep -qi "see the board, then pick" "$PLUGIN/skills/today/SKILL.md"'
-ck "today: structured multi-select reconcile"   'grep -qi "structured multi-select" "$PLUGIN/skills/today/SKILL.md"'
-ck "today: prints the board once"               'grep -qi "print the board ONCE" "$PLUGIN/skills/today/SKILL.md"'
-ck "today: surfaces overdue / due-soon"         'grep -qi "overdue" "$PLUGIN/skills/today/SKILL.md"'
-ck "week: wider lens, runs first"               'grep -qi "wider lens" "$PLUGIN/skills/week/SKILL.md"'
-ck "week: structured multi-select reconcile"    'grep -qi "structured multi-select" "$PLUGIN/skills/week/SKILL.md"'
+echo "════ 17. Orientation contract — priorities first, board is a state check (W9/W10 v2 → v2.5 Real C) ════"
+ck "today: daily orientation, not board reconciliation" 'grep -qi "daily \*\*orientation\*\*" "$PLUGIN/skills/today/SKILL.md"'
+ck "today: --orient is the one print (no board dump)"  'grep -q "vt-today.sh\" --orient" "$PLUGIN/skills/today/SKILL.md" && ! grep -q "vt-render.sh\"$" "$PLUGIN/skills/today/SKILL.md"'
+ck "today: board is a state check only"                'grep -qi "state check" "$PLUGIN/skills/today/SKILL.md"'
+ck "today: surfaces overdue / due-soon"                'grep -qi "overdue" "$PLUGIN/skills/today/SKILL.md"'
+ck "today: free text lands in the store (no detour)"   'grep -qi "free text becomes a store item" "$PLUGIN/skills/today/SKILL.md"'
+ck "week: wider lens, runs first"                      'grep -qi "wider lens" "$PLUGIN/skills/week/SKILL.md"'
+ck "week: --orient print + honest prune"               'grep -q "vt-week.sh\" --orient" "$PLUGIN/skills/week/SKILL.md" && grep -qi "honest ending" "$PLUGIN/skills/week/SKILL.md"'
+ck "today/week: no board multi-select reconcile ritual" '! grep -qi "structured multi-select" "$PLUGIN/skills/today/SKILL.md" && ! grep -qi "structured multi-select" "$PLUGIN/skills/week/SKILL.md"'
 ck "prioritize: focus-only escape"              'grep -qi "focus-only" "$PLUGIN/skills/prioritize/SKILL.md"'
+ck "prioritize: mid-day direct add + drop"      'grep -q "vt-priority.sh\" drop" "$PLUGIN/skills/prioritize/SKILL.md" && grep -q "week add" "$PLUGIN/skills/prioritize/SKILL.md"'
 ck "capture: user-invoked only"                 'grep -q "disable-model-invocation: true" "$PLUGIN/skills/capture/SKILL.md"'
 ck "configure: pin-the-board onboarding tip"    'grep -qi "pin" "$PLUGIN/skills/configure/SKILL.md"'
 
-echo
 echo "════ 18. Dense-grid cell-scoping — lookups must not bleed across co-located cells (regression) ════"
 # The dense grid packs MANY stories onto one physical line. A per-LINE scan grabs a
 # neighbour cell's due:/type: token (caught live in the beta sandbox: drift mis-read every
@@ -713,6 +715,77 @@ ck "cap-allows: prioritize covers mutate"         'vt_cap_allows prioritize muta
 # missing lever field on legacy item → later
 printf 'id=CAP-LEG\nproject=P0\ntitle=Legacy\ntype=dev\nwhy=\ndeadline=\nstate=active\ncaptured_at=2026-09-06T00:00:00Z\nactivated_at=2026-09-06T00:00:00Z\nexpired_at=\ncleared_at=\n' > "$VT_DIR/store/items/CAP-LEG"
 ck "lever-legacy: missing field reads as later"   '[ "$(bash -c "source \"'"$S"'/vt-store-lib.sh\"; vt_store_get_lever \"$VT_DIR/store/items/CAP-LEG\"")" = "later" ]'
+unset VT_DIR
+
+echo "════ 26. v2.5 Real C: living priorities — orient · direct add · carry-forward · gate=orientation ════"
+W26=$(mktemp -d); export VT_DIR="$W26/.4loops"
+D1=$(date -v-1d +%F 2>/dev/null || date -d 'yesterday' +%F)
+bash "$S/vt-init.sh" >/dev/null
+bash "$S/vt-config.sh" project P0 "dev-os" dev-os >/dev/null
+bash "$S/vt-config.sh" week-start mon >/dev/null
+bash "$S/vt-draft.sh" P0 "Board story" "why" "" >/dev/null
+bash "$S/vt-transition.sh" P0-001 in-progress >/dev/null
+printf 'P0\tUrgent cap\tdev\tx\turgent\n'         | bash "$S/vt-store-capture.sh" >/dev/null   # CAP-001
+printf 'P0\tToday cap\tdev\tx\ttoday\n'           | bash "$S/vt-store-capture.sh" >/dev/null   # CAP-002
+printf 'P0\tDue this week\tdev\tx\t%s\n' "$TODAY" | bash "$S/vt-store-capture.sh" >/dev/null   # CAP-003 later, due today
+printf 'P0\tParked\tdev\tx\t\n'                   | bash "$S/vt-store-capture.sh" >/dev/null   # CAP-004 later
+B26=$(shasum -a 256 "$VT_DIR/board.md" | awk '{print $1}')
+# week orientation: board in-progress → urgent → today → due-this-week; later is a count
+WO=$(bash "$S/vt-week.sh" --orient)
+ck "week --orient: suggests board work, urgent, today, due-this-week" 'printf "%s" "$WO" | grep -q "^SUGGESTED_FOCUS: P0-001 CAP-001 CAP-002 CAP-003$"'
+ck "week --orient: later is a count, not a dump"                      'printf "%s" "$WO" | grep -q "later: 2 parked"'
+ck "week --orient: titles + state tags"                               'printf "%s" "$WO" | grep -q "CAP-001  Urgent cap  \[store·urgent\]"'
+# week set with a board ID, a CAP, and free text → free text lands in the store (lever=later, active)
+bash "$S/vt-week.sh" P0-001 CAP-001 "New week anchor" >/tmp/vt26-week.txt 2>&1
+ck "week set: free text → store item, lever=later"  'grep -q "^lever=later$" "$VT_DIR/store/items/CAP-005" && grep -q "^state=active$" "$VT_DIR/store/items/CAP-005"'
+ck "week set: focus holds board + CAP + new item"   'grep -q "^Focus: P0-001 · CAP-001 · CAP-005$" "$VT_DIR/current-priorities.md"'
+ck "week set: logged to priorities.log"             'grep -q "	week	P0-001 CAP-001 CAP-005	week$" "$VT_DIR/priorities.log"'
+# today orientation: no previous focus → board in-progress, then urgent, then today; week anchors marked
+TO=$(bash "$S/vt-today.sh" --orient)
+ck "today --orient: suggested = board in-progress + urgent + today" 'printf "%s" "$TO" | grep -q "^SUGGESTED_FOCUS: P0-001 CAP-001 CAP-002$"'
+ck "today --orient: shows how today meets the week"                 'printf "%s" "$TO" | grep -q "P0-001  Board story  \[in-progress\]  ← in suggested today"'
+ck "today --orient: first run stamp"                                'printf "%s" "$TO" | grep -q "Today stamp: none (first run)"'
+# today set: CAP + free text → new CAP lever=today; CAP-001 urgent→today; CAP-002 (today, left out) → later
+bash "$S/vt-today.sh" CAP-001 "Fix login bug" >/tmp/vt26-today.txt 2>&1
+ck "today set: free text → store item, lever=today"    'grep -q "^lever=today$" "$VT_DIR/store/items/CAP-006" && grep -q "^state=active$" "$VT_DIR/store/items/CAP-006"'
+ck "today set: focus line + titled items"              'grep -q "^Focus: CAP-001 · CAP-006$" "$VT_DIR/current-priorities.md" && grep -q "^- CAP-006  Fix login bug  \[store·today\]$" "$VT_DIR/current-priorities.md"'
+ck "today set: committed CAP urgent → today"           'grep -q "^lever=today$" "$VT_DIR/store/items/CAP-001"'
+ck "today set: left-out today item → later (logged)"   'grep -q "^lever=later$" "$VT_DIR/store/items/CAP-002" && grep -q "CAP-002 | lever:today → lever:later | dropped-from-today" "$VT_DIR/store/transitions.log"'
+ck "today set: gate clear (today + week fresh)"        '! bash -c "cd \"$W26\" && source \"$S/vt-guard-lib.sh\" && vt_gate_active"'
+# mid-day direct add / drop / week add
+bash "$S/vt-priority.sh" add "Mid-day surprise" >/tmp/vt26-add.txt 2>&1
+ck "priority add: free text → CAP lever=today, in focus"  'grep -q "^lever=today$" "$VT_DIR/store/items/CAP-007" && grep -q "^Focus: CAP-001 · CAP-006 · CAP-007$" "$VT_DIR/current-priorities.md"'
+bash "$S/vt-priority.sh" drop CAP-001 >/tmp/vt26-drop.txt 2>&1
+ck "priority drop: out of focus, CAP → later"             'grep -q "^Focus: CAP-006 · CAP-007$" "$VT_DIR/current-priorities.md" && grep -q "^lever=later$" "$VT_DIR/store/items/CAP-001"'
+bash "$S/vt-priority.sh" week add CAP-002 >/tmp/vt26-wadd.txt 2>&1
+ck "priority week add: anchors grow, lever untouched"     'grep -q "^Focus: P0-001 · CAP-001 · CAP-005 · CAP-002$" "$VT_DIR/current-priorities.md" && grep -q "^lever=later$" "$VT_DIR/store/items/CAP-002"'
+bash "$S/vt-priority.sh" --project P0 add "Project item" >/dev/null 2>&1
+ck "priority add --project: key honored"                  'grep -q "^project=P0$" "$VT_DIR/store/items/CAP-008"'
+bash "$S/vt-priority.sh" add P0-999 >/dev/null 2>/tmp/vt26-warn.txt
+ck "priority add: unknown ID kept, warned"                'grep -q "P0-999" "$VT_DIR/current-priorities.md" && grep -q "not on the board or in the store" /tmp/vt26-warn.txt'
+bash "$S/vt-priority.sh" drop P0-999 >/dev/null 2>&1
+SINCE=$(bash "$S/vt-priority.sh" since)
+ck "priority since: store items landed since stamp"       'printf "%s" "$SINCE" | grep -q "CAP-003  Due this week  \[store·later\]"'
+# carry-forward: expire a focus CAP → dropped from carry; still-alive stays the default
+bash "$S/vt-store-expire.sh" --force-expire CAP-006 >/dev/null
+ck "carry-forward: expired CAP leaves the default"        '[ "$(bash "$S/vt-today.sh" --default)" = "CAP-007 CAP-008" ]'
+TO2=$(bash "$S/vt-today.sh" --orient)
+ck "today --orient: dropped shows honest ending"          'printf "%s" "$TO2" | grep -q "dropped (done / retired / expired):" && printf "%s" "$TO2" | grep -q "CAP-006  Fix login bug  \[store·expired\]"'
+ck "today --orient: fresh stamp = re-orienting mid-day"   'printf "%s" "$TO2" | grep -q "(fresh — re-orienting mid-day)"'
+# yesterday: derived from priorities.log + transitions, not an archive file
+printf '%sT08:00:00Z\ttoday\tP0-001 CAP-002\ttoday\n' "$D1" >> "$VT_DIR/priorities.log"
+Y=$(bash "$S/vt-today.sh" --yesterday)
+ck "yesterday: last Today focus from priorities.log"      'printf "%s" "$Y" | grep -q "Last Today ('"$D1"') focus:" && printf "%s" "$Y" | grep -q "P0-001  Board story"'
+ck "yesterday: board + store transitions sections"        'printf "%s" "$Y" | grep -q "Board transitions on '"$D1"':" && printf "%s" "$Y" | grep -q "Store transitions on '"$D1"':"'
+# board is a state check: never written by any of the above
+ck "real-c: board.md hash unchanged throughout"           '[ "'"$B26"'" = "$(shasum -a 256 "$VT_DIR/board.md" | awk "{print \$1}")" ]'
+# gate = orientation: read-only ritual modes are never gated; setting focus still is
+ck "rail-tier: vt-today --orient is readonly"             '[ "$(vt_rail_tier_for vt-today "bash \"$S/vt-today.sh\" --orient")" = "readonly" ]'
+ck "rail-tier: vt-week --default is readonly"             '[ "$(vt_rail_tier_for vt-week "\"$S/vt-week.sh\" --default")" = "readonly" ]'
+ck "rail-tier: vt-today --yesterday is readonly"          '[ "$(vt_rail_tier_for vt-today "$S/vt-today.sh --yesterday")" = "readonly" ]'
+ck "rail-tier: chained --orient; set is NOT readonly"     '[ "$(vt_rail_tier_for vt-today "$S/vt-today.sh --orient; $S/vt-today.sh P0-1")" = "gateclear-today" ]'
+ck "rail-tier: vt-today <ids> stays gateclear"            '[ "$(vt_rail_tier_for vt-today "$S/vt-today.sh P0-1")" = "gateclear-today" ]'
+ck "gate copy: orientation, no state moves required"      'vt_gate_directive | grep -q "orientation stale" && vt_gate_directive | grep -q "no state moves are required"'
 unset VT_DIR
 
 echo "════ RESULT: $P passed, $F failed ════"

@@ -1,22 +1,22 @@
 ---
 name: prioritize
-description: Thin prioritize escape — set/change store priority levers (urgent|today|later) and pull items into today's focus set. Also mid-cycle board focus add/set/since. Never drafts onto board Backlog; never requires deadline/impact/resource forms.
+description: Thin, focus-only escape for mid-flight priority edits — add / set / drop items on today's focus or the week's anchors directly (board IDs, store CAP IDs, or free text that lands in the store on the spot), and change store levers (urgent|today|later). Never drafts onto board Backlog; never requires deadline/impact/resource forms.
 allowed-tools: Bash, AskUserQuestion
 disable-model-invocation: true
 user-invocable: true
-argument-hint: "[lever <CAP-ID> <urgent|today|later> | today <CAP-ID…> | add <id…> | set <id…> | since]"
+argument-hint: "[add|set|drop <ID|\"text\">… | week add|set|drop … | lever <CAP-ID> <urgent|today|later> | since]"
 ---
 
-`/prioritize` is a **thin, focus-only escape** and the **real “scope” act** for v2.5 Track C: set or change **priority levers** on detached-store items and commit **today’s focus**. It does **not** write board columns and does **not** promote capacity scope docs. Week stays the `/week` ritual — not a fourth lever.
+`/prioritize` is the **thin, focus-only escape** between the rituals: re-point today's focus or the week's anchors **without re-running `/today` / `/week`**, and adjust store levers. The living priorities doc (`current-priorities.md`) is the surface; the detached store is where new items land. It does **not** write board columns and does **not** promote capacity scope docs.
 
 User-invoked only (`disable-model-invocation: true`) — the agent can't fire it on its own.
 
-## Surfaces (LOCKED loop revision)
+## Surfaces
 
 | Surface | This command |
 | --- | --- |
-| **Store levers** | `urgent` \| `today` \| `later` — change / pull to today |
-| **Board focus** | Optional mid-cycle `add`/`set`/`since` on `current-priorities.md` (committed board IDs) |
+| **`current-priorities.md`** (Today + Week) | `add` / `set` / `drop` — mid-flight edits; Today edits freshen the day stamp |
+| **Store** (`.4loops/store/`, levers `urgent\|today\|later`) | Free text you add becomes a store item on the spot; `lever` changes a CAP's lever |
 | **Board.md columns** | NEVER — no `vt-arrange` / `vt-draft` / Backlog dumps |
 | **Scope docs** | Parked — do not call `vt-scope-promote` as product path |
 
@@ -35,59 +35,67 @@ If `UNCONFIGURED`, stop: **"No 4loops board here yet — run `/4loops:configure`
 
 ## Usage
 
-**Store levers (Track C primary):**
-- `/prioritize lever <CAP-ID> <urgent|today|later>` — change lever on one CAP.
-- `/prioritize today <CAP-ID…>` — pull `later`/`urgent` item(s) into `today`.
-- `/prioritize` (bare, store path) — list by lever, then ONE pick to pull into today or change lever.
+**Today (mid-day direct add — the primary path):**
+- `/prioritize add <ID|"text">…` — append to today's focus. IDs may be board (`P0-12`) or store (`CAP-003`); anything else is **free text → new store item** (`lever=today`, state active), no `/capture` step.
+- `/prioritize set <ID|"text">…` — replace today's focus wholesale.
+- `/prioritize drop <ID>…` — take items off today. A CAP goes back to `lever=later` (logged in `store/transitions.log` — an honest park, not a deletion).
 
-**Board focus (legacy mid-cycle hatch):**
-- `/prioritize add <id…>` — append to today's board focus (dedup).
-- `/prioritize set <id…>` — replace today's board focus wholesale.
-- `/prioritize since` — what's landed since last focus stamp (no change).
+**Week (anchors):**
+- `/prioritize week add|set|drop …` — same shape for the week's anchors. Free text lands with `lever=later` (week is **not** a lever; `/today` pulls it in when its day comes).
+
+**Store levers:**
+- `/prioritize lever <CAP-ID> <urgent|today|later>` — change one CAP's lever without touching focus.
+- `/prioritize` (bare) — show the orientation block, then ONE pick: add to today / add to week / change a lever.
+
+**Read:**
+- `/prioritize since` — board + store items that landed since the last Today stamp and aren't in focus (no change).
 
 ## Steps
 
-### A. Store lever change / pull to today
+### A. Direct add / set / drop (today or week)
 
 ```bash
-"${CLAUDE_PLUGIN_ROOT}/scripts/vt-store-list.sh" live
-"${CLAUDE_PLUGIN_ROOT}/scripts/vt-store-list.sh" later
-"${CLAUDE_PLUGIN_ROOT}/scripts/vt-store-list.sh" today
-BOARD_BEFORE=$(shasum -a 256 "${VT_DIR:-./.4loops}/board.md" | awk '{print $1}')
-# change among urgent|today|later
-"${CLAUDE_PLUGIN_ROOT}/scripts/vt-store-lever.sh" CAP-NNN today
-# or pull one-or-many into today
-"${CLAUDE_PLUGIN_ROOT}/scripts/vt-store-lever.sh" today CAP-NNN [CAP-MMM …]
-BOARD_AFTER=$(shasum -a 256 "${VT_DIR:-./.4loops}/board.md" | awk '{print $1}')
-# board hash must match
-"${CLAUDE_PLUGIN_ROOT}/scripts/vt-store-list.sh" today
-```
-
-No deadline / impact / resource questions — levers only.
-
-### B. Board focus (optional)
-
-If the user named **board** IDs (`P0-NNN`), apply directly:
-
-```bash
-"${CLAUDE_PLUGIN_ROOT}/scripts/vt-priority.sh" add <id…>
-"${CLAUDE_PLUGIN_ROOT}/scripts/vt-priority.sh" set <id…>
+"${CLAUDE_PLUGIN_ROOT}/scripts/vt-priority.sh" [--project P] add  <ID|"text"> ...
+"${CLAUDE_PLUGIN_ROOT}/scripts/vt-priority.sh" [--project P] set  <ID|"text"> ...
+"${CLAUDE_PLUGIN_ROOT}/scripts/vt-priority.sh" drop <ID> ...
+"${CLAUDE_PLUGIN_ROOT}/scripts/vt-priority.sh" [--project P] week add|set <ID|"text"> ...
+"${CLAUDE_PLUGIN_ROOT}/scripts/vt-priority.sh" week drop <ID> ...
 cat "${VT_DIR:-./.4loops}/current-priorities.md"
 ```
 
-Otherwise for board mid-cycle: `vt-priority.sh since` + `vt-drift.sh` + ONE `AskUserQuestion`.
+- Quote each free-text item as one argument. `--project` picks the store project key for new items (default: first board project).
+- Today edits keep store levers coherent (committed CAP → `today`; a `today` CAP left out → `later`), freshen the Today stamp, and lift the gate when today + week are fresh. `board.md` is never written.
+- If the user said it in prose, apply directly — the ask *is* the confirmation. Only ask when an item is genuinely ambiguous (which project, ID vs new item).
+
+### B. Bare `/prioritize` — orient, then one pick
+
+```bash
+"${CLAUDE_PLUGIN_ROOT}/scripts/vt-today.sh" --orient      # carry-forward · store pull · week anchors · SUGGESTED_FOCUS
+"${CLAUDE_PLUGIN_ROOT}/scripts/vt-store-list.sh" later     # the parked list (the only place it's dumped)
+```
+
+ONE `AskUserQuestion` (`multiSelect: true`, options `ID — title [lever]` from the store pull + parked list): **Add to today** / **Add to week** / **Mark urgent** — then step A or C. Nothing selected → no change.
+
+### C. Store lever change
+
+```bash
+"${CLAUDE_PLUGIN_ROOT}/scripts/vt-store-lever.sh" CAP-NNN urgent|today|later
+"${CLAUDE_PLUGIN_ROOT}/scripts/vt-store-list.sh" live
+```
+
+No deadline / impact / resource questions — levers only.
 
 ## Illegal / refuse clearly
 
 | Situation | Behavior |
 | --- | --- |
-| Urge to dump onto board Backlog | Refuse — levers live in store |
+| Urge to dump onto board Backlog | Refuse — new items live in the store |
 | Required capacity form (deadline·impact·resource) | Refuse — parked Track B; levers only |
-| Week as a fourth lever | Redirect to `/week` ritual |
-| CAP not found | Script errors; tell user to `/capture` first |
+| Week as a fourth lever | Not a lever — use `week add` for anchors |
+| CAP not found | Script errors; name it as free text to create it, or `/capture` |
 
 ## Notes
 
-- Priority stays **yours** — propose, you decide. Mutations ride the rails; never hand-edit records.
-- New work → `/capture` (optional lever) or `/sync`. Board state move → `/manage` or `/sync`.
-- Scripts: `vt-store-lever.sh` (mutate), `vt-store-list.sh` (readonly, filter by lever).
+- Priority stays **yours** — propose, you decide. Mutations ride the rails; never hand-edit `current-priorities.md` / store records.
+- Brain-dump without prioritizing → `/capture`. Board state move → `/manage` or `/sync`. Full orientation → `/today` / `/week`.
+- Scripts: `vt-priority.sh` (mutate), `vt-store-lever.sh` (mutate), `vt-store-list.sh` / `vt-today.sh --orient` (readonly).

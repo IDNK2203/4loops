@@ -36,9 +36,11 @@ usage() {
 sandbox.sh — clean-room workspaces for dogfooding 4loops
 
 USAGE
-  sandbox.sh demo <a|b> [--no-launch] [--bypass]   ONE-SHOT: build a fresh, uniquely-named
-                                 sandbox for Track A (a, empty) or Track B (b, seeded) and launch
-                                 Claude in it. No prior workspace needed — run any time.
+  sandbox.sh demo <a|b|c> [--no-launch] [--bypass]   ONE-SHOT: build a fresh, uniquely-named
+                                 sandbox — a = empty (onboarding), b = seeded mid-week board,
+                                 c = b + detached store (levers) + yesterday's Today focus, for the
+                                 v2.5 Real C orientation loop (/week → /today → /prioritize) —
+                                 and launch Claude in it. No prior workspace needed — run any time.
                                  --bypass launches with VT_ALLOW_STALE_GATE=1 (gate OFF, user-only).
   sandbox.sh new [--light|--isolated] [--real-install] [--empty|--seeded] [name]
   sandbox.sh relaunch [name] [--bypass]   reopen a sandbox in a fresh Claude session (default:
@@ -164,6 +166,24 @@ seed_board() {  # <vt_dir> — drive the REAL vt CLI so seeding exercises it too
   : > "$vtdir/.armed"   # pre-arm: armed + stale focus = gate active, so B1 is demoable immediately
 }
 
+seed_store() {  # <vt_dir> — v2.5 Real C: a lived-in detached store + a stale (yesterday) Today
+  local vtdir="$1" d_yest d_soon  # focus, so /today has real carry-forward and a real store pull.
+  d_yest=$(date -v-1d +%F 2>/dev/null || date -d 'yesterday' +%F)
+  d_soon=$(date -v+2d +%F 2>/dev/null || date -d '2 days' +%F)
+  cap() { printf '%s\n' "$1" | VT_DIR="$vtdir" bash "$PLUGIN_SCRIPTS/vt-store-capture.sh" >/dev/null; }
+  cap "$(printf 'WEB\tFix the login redirect loop\tdev\tsupport thread\turgent')"         # CAP-001 urgent
+  cap "$(printf 'API\tRate-limit the metrics endpoint\tdev\tnoisy client\ttoday')"        # CAP-002 today
+  cap "$(printf 'WEB\tDraft the launch email\tdev\tmarketing asked\t%s' "$d_soon")"        # CAP-003 later, due this week
+  cap "$(printf 'API\tSpike: OpenTelemetry vs homegrown tracing\tmodeling\t\t')"          # CAP-004 later
+  cap "$(printf 'WEB\tClean up the old dashboard branch\tdev\t\t')"                       # CAP-005 later
+  VT_DIR="$vtdir" bash "$PLUGIN_SCRIPTS/vt-store-expire.sh" --activate-only >/dev/null
+  # Yesterday's Today focus (board + a CAP) — backdated so today starts from carry-forward.
+  ( cd "$vtdir/.." && VT_DIR="$vtdir" VT_ALLOW_TODAY_FIRST=1 bash "$PLUGIN_SCRIPTS/vt-today.sh" WEB-001 API-001 CAP-002 >/dev/null )  # cwd = workspace → doc title
+  perl -pi -e "s/^## Today \(\d{4}-\d{2}-\d{2}\)/## Today ($d_yest)/" "$vtdir/current-priorities.md"
+  perl -pi -e "s/^\d{4}-\d{2}-\d{2}(T\S+\ttoday\t)/${d_yest}\$1/" "$vtdir/priorities.log"
+  rm -rf "$vtdir/.cleared"; mkdir -p "$vtdir/.cleared"   # stale focus + armed = gate active on launch
+}
+
 write_settings() {  # <config-dir> — injection settings (directory-source marketplace)
   local cfg="$1"
   mkdir -p "$cfg"
@@ -285,7 +305,8 @@ cmd_new() {
 # No dependency on any prior workspace — run it any time, even right after `prune`.
 #   sandbox.sh demo a   → Track A (empty: install → /configure → …)
 #   sandbox.sh demo b   → Track B (seeded mid-week, fresh ISO week)
-#   sandbox.sh demo <a|b> --no-launch   → just build + print the launch command
+#   sandbox.sh demo c   → v2.5 Real C (b + store levers + yesterday's Today focus)
+#   sandbox.sh demo <a|b|c> --no-launch   → just build + print the launch command
 cmd_demo() {
   local track="${1:-}" launch=1 bypass=0 ts seed root ws
   shift || true
@@ -296,7 +317,8 @@ cmd_demo() {
   case "$track" in
     a|A|fresh|empty)    EMPTY=true;  seed=fresh ;;
     b|B|seeded|midweek) EMPTY=false; seed=midweek ;;
-    *) die "usage: sandbox demo <a|b> [--no-launch]  (a = Track A empty/onboarding, b = Track B seeded)" ;;
+    c|C|realc|store)    EMPTY=false; seed=realc ;;
+    *) die "usage: sandbox demo <a|b|c> [--no-launch]  (a = empty/onboarding, b = seeded board, c = seeded board + store + yesterday focus)" ;;
   esac
   MODE=light; INSTALL=""
   ts=$(date +%Y%m%d-%H%M%S)
@@ -305,6 +327,7 @@ cmd_demo() {
   mkdir -p "$ws"
   scaffold_mock "$ws"
   [ "$EMPTY" = false ] && seed_board "$ws/.4loops"
+  [ "$seed" = realc ] && seed_store "$ws/.4loops"
   write_meta "$root"
   echo "✓ fresh sandbox '$NAME'  ($root)" >&2
   if [ "$launch" = 1 ]; then
