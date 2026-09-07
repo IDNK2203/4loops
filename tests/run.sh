@@ -849,5 +849,64 @@ ck "vt_dir: relative default from a subdir resolves to the workspace" '( cd "$W2
 ck "sandbox: launcher pins VT_DIR to the workspace"          'grep -q "exec env VT_DIR=\"\$ws/.4loops\" claude" "$PLUGIN/../sandbox/sandbox.sh" && grep -q "exec env VT_DIR=\"\$ws/.4loops\" VT_ALLOW_STALE_GATE=1 claude" "$PLUGIN/../sandbox/sandbox.sh"'
 ck "hooks + rails agree: the gate reads the file the rail wrote" '( cd "$W27/web-app/src" && printf "{\"session_id\":\"S27\",\"cwd\":\"%s\",\"tool_input\":{\"file_path\":\"%s\"}}" "$W27/web-app/src" "$W27/web-app/src/x.js" | env -u VT_DIR bash "$H/vt-gate.sh" 2>&1 ) | { ! grep -q "\"deny\""; }'
 
+echo "════ 28. v2.5 Packet 007: orient survives an empty done-set + the midweek (Tue+) dogfood seed ════"
+# The 2026-09-07 dogfood crash: _transitions_since ended with `[ -n "$d" ] && { … }`, so an empty
+# done-set returned 1 and `set -euo pipefail` in vt-week.sh killed --orient BEFORE the machine
+# lines. Nothing marked done is the NORMAL state, so orient must complete and exit 0.
+W28=$(mktemp -d); export VT_DIR="$W28/.4loops"
+bash "$S/vt-init.sh" >/dev/null
+bash "$S/vt-config.sh" project P0 "dev-os" dev-os >/dev/null
+bash "$S/vt-config.sh" week-start mon >/dev/null
+bash "$S/vt-draft.sh" P0 "Board story" "why" "" >/dev/null
+printf 'P0\tUrgent cap\tdev\tx\turgent\n' | bash "$S/vt-store-capture.sh" >/dev/null   # CAP-001
+printf 'P0\tToday cap\tdev\tx\ttoday\n'   | bash "$S/vt-store-capture.sh" >/dev/null   # CAP-002
+bash "$S/vt-store-expire.sh" --activate-only >/dev/null
+bash "$S/vt-week.sh" set P0-001 CAP-001 --today P0-001 CAP-001 >/dev/null 2>&1
+# ── follow-up day (Tue+), nothing marked done: the exact crash shape
+perl -pi -e "s/^## Today \(\d{4}-\d{2}-\d{2}\)/## Today ($D1)/" "$VT_DIR/current-priorities.md"
+ck "empty done-set: priorities.log really has no done rows" '! grep -q "	done	" "$VT_DIR/priorities.log"'
+if WO28=$(bash "$S/vt-week.sh" --orient 2>/tmp/vt28-err.txt); then RC28=0; else RC28=$?; fi
+ck "orient (follow-up, nothing done): exits 0"              '[ "'"$RC28"'" = "0" ]'
+ck "orient (follow-up, nothing done): runs to the machine lines" 'printf "%s" "$WO28" | grep -q "^MODE: follow-up$" && printf "%s" "$WO28" | grep -q "^WEEK_SUGGESTED: " && printf "%s" "$WO28" | grep -q "^TODAY_SUGGESTED: "'
+ck "orient (follow-up, nothing done): look-back printed, no done section" 'printf "%s" "$WO28" | grep -q "^Look-back · since '"$D1"':$" && ! printf "%s" "$WO28" | grep -q "marked done since"'
+# ── new week (Monday), nothing marked done: same guard on the last-week look-back
+perl -pi -e "s/^## Week \d+ /## Week $LW /" "$VT_DIR/current-priorities.md"
+if WO28B=$(bash "$S/vt-week.sh" --orient 2>>/tmp/vt28-err.txt); then RC28B=0; else RC28B=$?; fi
+ck "orient (new-week, nothing done): exits 0 and prints the machine lines" '[ "'"$RC28B"'" = "0" ] && printf "%s" "$WO28B" | grep -q "^MODE: new-week" && printf "%s" "$WO28B" | grep -q "^TODAY_SUGGESTED: "'
+# ── and it still PRINTS the done section when there is one
+bash "$S/vt-priority.sh" done CAP-001 >/dev/null 2>&1
+WO28C=$(bash "$S/vt-week.sh" --orient)
+ck "orient: a non-empty done-set is still reported"         'printf "%s" "$WO28C" | grep -q "marked done since" && printf "%s" "$WO28C" | grep -q "^TODAY_SUGGESTED: "'
+# ── archived story keeps its title in the look-back (the "[x] API-003  ?" dogfood print)
+bash "$S/vt-transition.sh" P0-001 done >/dev/null 2>&1
+bash "$S/vt-close.sh" --weekly >/dev/null 2>&1
+ck "archived story: off the board"                          '! grep -q "P0-001" "$VT_DIR/board.md"'
+ck "archived story: look-back keeps the title, not \"?\"" 'WOA=$(bash "$S/vt-week.sh" --orient); printf "%s" "$WOA" | grep -q "\[x\] P0-001  Board story" && ! printf "%s" "$WOA" | grep -q "P0-001  ?"'
+# ── same class: drift rails must not leave a non-zero status behind
+ck "drift: vt-drift.sh exits 0 with drift present"          'bash "$S/vt-drift.sh" >/dev/null 2>&1'
+ck "drift: vt-close.sh daily exits 0"                       'bash "$S/vt-close.sh" >/dev/null 2>&1'
+unset VT_DIR
+# ── the midweek (Tue+) dogfood seed: week stamp CURRENT, only Today stale
+SB="$PLUGIN/../sandbox/sandbox.sh"
+ck "sandbox: demo c takes --midweek"                        'grep -q -- "--midweek|--tue) midweek=1" "$SB" && grep -q -- "--midweek applies to demo c only" "$SB"'
+ck "sandbox: --midweek keeps the week stamp on the current ISO week" 'grep -q "if \[ \"\$midweek\" != 1 \]; then" "$SB"'
+if MWOUT=$(bash "$SB" demo c --midweek --no-launch 2>&1); then MW_RC=0; else MW_RC=$?; fi
+ck "sandbox: demo c --midweek exits 0"                      '[ "$MW_RC" = "0" ]'
+MWWS=$(printf "%s" "$MWOUT" | grep -o "/tmp/vt-sandbox-beta-realc-midweek-[0-9-]*/workspace" | head -1)
+ck "sandbox: --midweek builds a distinctly-named sandbox"   '[ -n "'"$MWWS"'" ] && [ -d "'"$MWWS"'/.4loops" ]'
+ck "sandbox: midweek walk written to DOGFOOD-REAL-C.md"     'grep -q "MIDWEEK (Tue+) variant" "'"$MWWS"'/DOGFOOD-REAL-C.md"'
+ck "sandbox: midweek seed = current Week header, yesterday Today" 'grep -q "^## Week '"$WK"' " "'"$MWWS"'/.4loops/current-priorities.md" && grep -q "^## Today ('"$D1"')$" "'"$MWWS"'/.4loops/current-priorities.md"'
+MWO=$(VT_DIR="$MWWS/.4loops" bash "$S/vt-week.sh" --orient)
+ck "sandbox midweek: orient completes — follow-up, since-yesterday, machine lines" 'printf "%s" "$MWO" | grep -q "^MODE: follow-up$" && printf "%s" "$MWO" | grep -q "^Look-back · since '"$D1"':$" && printf "%s" "$MWO" | grep -q "^TODAY_SUGGESTED: "'
+ck "sandbox midweek: no last-week dump"                     '! printf "%s" "$MWO" | grep -q "Look-back · last week"'
+ck "sandbox midweek: gate ACTIVE on launch (Today stale)"   'bash -c "cd \"'"$MWWS"'\" && VT_DIR=\"'"$MWWS"'/.4loops\" source \"$S/vt-priorities-lib.sh\" && vt_gate_active"'
+# default demo c is unchanged: prior week ⇒ new-week look-back
+if DCOUT=$(bash "$SB" demo c --no-launch 2>&1); then DC_RC=0; else DC_RC=$?; fi
+ck "sandbox: demo c exits 0"                                '[ "$DC_RC" = "0" ]'
+DCWS=$(printf "%s" "$DCOUT" | grep -o "/tmp/vt-sandbox-beta-realc-[0-9-]*/workspace" | head -1)
+DCO=$(VT_DIR="$DCWS/.4loops" bash "$S/vt-week.sh" --orient)
+ck "sandbox demo c (default): still new-week with a last-week look-back" 'printf "%s" "$DCO" | grep -q "^MODE: new-week" && printf "%s" "$DCO" | grep -q "^Look-back · last week (Week '"$LW"'):" && printf "%s" "$DCO" | grep -q "^TODAY_SUGGESTED: "'
+rm -rf "$(dirname "$MWWS")" "$(dirname "$DCWS")" 2>/dev/null || true
+
 echo "════ RESULT: $P passed, $F failed ════"
 [ "$F" -eq 0 ]

@@ -69,6 +69,19 @@ plain `[ ]`/`[x]` checkboxes. Already configured; it prints the accept walk and 
 `VT_DIR` from your shell can never point the rails elsewhere. Packet 006 dogfood, not the beta A/B
 arc — see `BETA-WALKTHROUGH.md` → Track C.
 
+### The midweek (Tue+) variant — `demo c --midweek`
+
+`bash sandbox/sandbox.sh demo c --midweek` seeds the same board + store, but leaves the **Week stamp
+on the current ISO week** and backdates **Today only**. That is the "it is not Monday" shape: the week
+is already set, you are opening the day. `/4loops:week` then runs in `MODE: follow-up` — the look-back
+is **since yesterday** (yesterday's Today, plus what moved since), not a last-week done/carried dump —
+and the week pick is cap-aware against the week you already have. The gate is still ACTIVE on launch
+(Today is stale), so the block → orient → clear walk is intact.
+
+Nothing is marked done in this seed, which is exactly the state that used to kill the orientation
+print before the machine lines (Packet 007). Use it to check that `/4loops:week` runs to the end:
+`MODE` / `WEEK_ACTIVE` / `WEEK_CAP_LEFT` / `WEEK_SUGGESTED` / `TODAY_SUGGESTED` all present.
+
 ## The walkthrough (seeded, isolated)
 
 1. **B3** — launch; the sentinel dashboard renders (cwd = workspace root).

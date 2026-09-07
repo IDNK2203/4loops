@@ -394,13 +394,20 @@ board_ids_in() {
 
 # Title for any focus ID (store title for CAP, board title otherwise).
 focus_title() {
-  local id="$1" p
+  local id="$1" p t=""
   if vt_is_cap_id "$id"; then
     p=$(vt_store_item_path "$id")
-    [ -f "$p" ] && vt_store_get "$p" title
+    if [ -f "$p" ]; then t=$(vt_store_get "$p" title); fi
   else
-    story_title "$id"
+    t=$(story_title "$id")
   fi
+  # A story the weekly rollover archived is off the board but still sits on the week as
+  # [x] — fall back to the title the priorities file already recorded, so the look-back
+  # reads "[x] API-003  Set up CI", not "[x] API-003  ?".
+  if [ -z "$t" ] && [ -f "$PRIORITIES" ]; then
+    t=$(awk -v id="$id" '$0 ~ "^- \\[.\\] " id "  " { sub(/^- \[.\] [^ ]+  /, ""); print; exit }' "$PRIORITIES")
+  fi
+  printf '%s\n' "$t"
 }
 
 # Deadline (YYYY-MM-DD) for any focus ID, or empty.
@@ -971,8 +978,15 @@ _transitions_since() {
   else echo "    (none)"; fi
   if [ -f "$PRIORITIES_LOG" ]; then
     local d; d=$(awk -F'\t' -v s="$since" '$2=="done" && substr($1,1,10) >= s {printf "%s ", $3}' "$PRIORITIES_LOG")
-    [ -n "$d" ] && { echo "  marked done since ${since}:"; _orient_lines "$(_merge_ids "" $d)" | sed 's/^/  /'; }
+    # `if`, not `[ … ] &&`: an empty done-set must not make this function return 1 —
+    # the callers run under `set -e`, which would kill the orientation print here,
+    # before WEEK_SUGGESTED / TODAY_SUGGESTED (the 2026-09-07 dogfood crash).
+    if [ -n "$d" ]; then
+      echo "  marked done since ${since}:"
+      _orient_lines "$(_merge_ids "" $d)" | sed 's/^/  /'
+    fi
   fi
+  return 0
 }
 
 # Look-back for a NEW week (Monday): last week's checkboxes — done vs carried —
@@ -1022,7 +1036,9 @@ render_week_orient() {
     render_lookback_week "$wk_stamp"
   else
     local since="$t_stamp"
-    [ -z "$since" ] || [ "$since" = "$today" ] && since=$(date -v-1d +%F 2>/dev/null || date -d 'yesterday' +%F)
+    if [ -z "$since" ] || [ "$since" = "$today" ]; then
+      since=$(date -v-1d +%F 2>/dev/null || date -d 'yesterday' +%F)
+    fi
     render_lookback_since "$since"
   fi
   echo ""

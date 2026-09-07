@@ -150,6 +150,23 @@ gate clears. No `/4loops:today` needed (it's only a mid-day re-pull). Then `/4lo
 The launcher pins `VT_DIR` to the sandbox workspace, so a stale `VT_DIR` in your shell can't redirect
 the rails (the Packet 005 mixup).
 
+### `demo c --midweek` — the Tue+ shape (Packet 007)
+
+```bash
+bash …/sandbox/sandbox.sh demo c --midweek
+```
+
+Same seed, one difference: the **Week stamp stays on the current ISO week** and only **Today** is
+backdated to yesterday. `/4loops:week` opens in `MODE: follow-up` with a **since-yesterday** look-back
+instead of a last-week dump, and the week pick is capped against the week you already have. The gate
+is still ACTIVE on launch (stale Today), so the block → orient → clear walk still holds. Judge it on:
+
+- `MODE: follow-up`, `Look-back · since <yesterday>`, and **no** "Look-back · last week" line
+- the print reaches the machine lines — `WEEK_ACTIVE` / `WEEK_CAP_LEFT` / `WEEK_SUGGESTED` /
+  `TODAY_SUGGESTED` (nothing is marked done in this seed; that empty done-set is what used to crash
+  the orientation before Packet 007)
+- one rail call commits both picks and the gate clears — no `/4loops:today` needed
+
 ## Bypassing the lock — the break-glass (yours alone)
 
 The gate is **un-bypassable by the agent.** When it's blocked, the agent's *only* sanctioned move is to

@@ -136,7 +136,10 @@ render_drift() {
   [ -n "$caps" ]  && out="${out}cap[$(printf '%s' "$caps" | paste -sd ', ' -)]; "
   [ -n "$stale" ] && out="${out}stale[$(printf '%s' "$stale" | paste -sd ', ' -)]; "
   if [ -n "$ab" ]; then n=$(printf '%s\n' "$ab" | grep -c .); out="${out}${n} abandoned candidate(s); "; fi
-  [ -n "$out" ] && printf '[DRIFT] %s' "${out%; }"
+  # `if`, not `[ … ] &&` — a clean board must not leave a non-zero status behind
+  # (same set -e class as the orientation crash).
+  if [ -n "$out" ]; then printf '[DRIFT] %s' "${out%; }"; fi
+  return 0
 }
 
 # Verbose drift report with titles (for the weekly rollover + the reconciliation ritual).
@@ -164,7 +167,8 @@ drift_report() {
     age=$(days_since "$(last_transition_date "$id")"); t=$(story_title "$id")
     echo "  abandon-candidate: $id ${age}d${t:+  — $t}"
   done < <(find_abandoned)
-  [ "$any" = 0 ] && echo "  (clean — no caps hit, nothing stale or abandoned)"
+  if [ "$any" = 0 ]; then echo "  (clean — no caps hit, nothing stale or abandoned)"; fi
+  return 0
 }
 
 # Recompute the **Counts:** header from the board (BSD/GNU sed).
