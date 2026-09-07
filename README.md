@@ -2,7 +2,7 @@
 
 > A personal orientation layer for solo operators, packaged as a Claude Code plugin: a story-state kanban + daily/weekly priorities + surfaced drift. You run two short rituals — and **between them you just talk**.
 
-4loops turns any workspace into a story-driven operator loop. Work is tracked as stories moving across a five-state board (**Backlog → Planning → In Progress → Testing → Done**). A short daily reconciliation sets your 1–3 focus stories; a weekly one sets your anchors. Drift — stale states, overdue/due-soon deadlines, column caps — is *surfaced*, never nagged. And the discipline is the product: when today's or this week's focus is stale, a hard gate blocks edits to your **product surfaces** until you reconcile the board. Reading, research, and notes are never blocked.
+4loops turns any workspace into a story-driven operator loop. Raw work is captured into a detached store; once you commit to it, it becomes a story moving across the active board (**Planning → In Progress → Testing → Done**), and Done is flushed to a monthly archive so the board stays a picture of what is live. A short daily reconciliation sets your 1–3 focus stories; a weekly one sets your anchors. Drift — stale states, overdue/due-soon deadlines, column caps — is *surfaced*, never nagged. And the discipline is the product: when today's or this week's focus is stale, a hard gate blocks edits to your **product surfaces** until you reconcile the board. Reading, research, and notes are never blocked.
 
 It operates on whatever workspace it is enabled in. All state is plain files under `.4loops/` — no database, no network.
 

@@ -22,6 +22,8 @@ source "$SCRIPT_DIR/../scripts/vt-priorities-lib.sh"
 source "$SCRIPT_DIR/../scripts/vt-guard-lib.sh"
 # shellcheck source=../scripts/vt-drift-lib.sh
 source "$SCRIPT_DIR/../scripts/vt-drift-lib.sh"
+# shellcheck source=../scripts/vt-board-lib.sh
+source "$SCRIPT_DIR/../scripts/vt-board-lib.sh"
 
 # If this workspace doesn't use 4loops, exit silently — don't pollute context.
 [ ! -d "$VT_DIR" ] && exit 0
@@ -56,7 +58,8 @@ DRIFT_LINE=$(render_drift || true)
 # none ⇒ a broken separator (hand-edit / markdown formatter). Warn, don't die.
 WARN_LINE=""
 if [ -f "$BOARD" ] \
-   && grep -q '^| Backlog | Planning | In Progress | Testing | Done |$' "$BOARD" 2>/dev/null \
+   && { grep -qxF '| Planning | In Progress | Testing | Done |' "$BOARD" 2>/dev/null \
+        || grep -qxF '| Backlog | Planning | In Progress | Testing | Done |' "$BOARD" 2>/dev/null; } \
    && grep -qE '^\|.*\*\*[A-Za-z0-9]+-[0-9]+\*\*' "$BOARD" 2>/dev/null \
    && [ -z "$(board_rows)" ]; then
   WARN_LINE="[WARN] board.md looks malformed — rows present but unparseable. Check the | --- | separator row."
@@ -94,6 +97,11 @@ else
 fi
 
 [ -n "${DRIFT_LINE:-}" ] && D="${D}${nl}${DRIFT_LINE}${nl}"
+
+# Board intake is closed (v2.5 Track D). A pre-migration board still holding cells
+# in the legacy Backlog pen says so once, here — the fix is a script, not a hand-edit.
+MIGRATE_LINE=$(vt_board_backlog_notice "$BOARD" || true)
+[ -n "${MIGRATE_LINE:-}" ] && D="${D}${MIGRATE_LINE}${nl}"
 
 # --- Session-scoped gate clearing + marker cleanup ------------------------------
 # A session that starts on an already-reconciled day carries its clearance forward

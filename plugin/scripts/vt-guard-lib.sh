@@ -234,6 +234,8 @@ vt_rail_tier() {
     vt-today) printf 'gateclear-today' ;;
     vt-week)  printf 'gateclear-week' ;;
     vt-transition|vt-priority|vt-draft|vt-arrange|vt-close|vt-repack|vt-refresh-counts|vt-gc|vt-init|vt-config|vt-store-capture|vt-store-expire|vt-store-lever|vt-scope-promote) printf 'mutate' ;;
+    # v2.5 Track D — board lifecycle writers (task CRUD, Done flush, key ops, migration)
+    vt-edit|vt-merge|vt-remove|vt-flush|vt-key|vt-migrate-backlog) printf 'mutate' ;;
     vt-render|vt-drift|vt-next-id|vt-detect|vt-store-list|vt-scope-list|vt-scope-read) printf 'readonly' ;;
     *) printf '' ;;
   esac

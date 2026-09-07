@@ -107,5 +107,5 @@ while IFS=$'\t' read -r proj title type why f5 f6 || [ -n "${proj:-}" ]; do
 done
 
 if [ "$DRY" = 0 ]; then
-  echo "store: captured ${created} item(s) into $(vt_store_dir)/items (off-board). Prioritize levers later — not board Backlog."
+  echo "store: captured ${created} item(s) into $(vt_store_dir)/items (off-board). Prioritize levers later — the board is active state only, and has no intake column."
 fi

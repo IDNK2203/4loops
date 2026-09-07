@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
 # vt-draft.sh <project> <title> [why] [context] [--type dev|modeling]
-# Creates a new story-draft row in the Backlog column of the kanban table.
+# Creates a new story row in the PLANNING column of the kanban table.
 # Auto-registers the project in the Projects table if first time seen.
+#
+# v2.5 Track D: the board is the ACTIVE pipeline, not a capture pen. Drafting is
+# an act of COMMITMENT — the row lands in Planning, ready to be started. Raw
+# capture belongs in the detached store (vt-store-capture.sh), which is what
+# /capture and /sync use; vt-draft is for work you have already decided to do.
 #
 # --type sets the story's objective shape (v2 / W1):
 #   dev      — objective fixed + testable; DONE = tests pass / shipped (default).
@@ -107,8 +112,14 @@ if [ "$PROJECT_EXISTS" != "yes" ]; then
   ' "$BOARD" > "${BOARD}.tmp" && mv "${BOARD}.tmp" "$BOARD"
 fi
 
-# Append a new row to the kanban; story in Backlog (col 1), empty elsewhere
-NEW_ROW="| ${CELL} |  |  |  |  |"
+# Append a new row to the kanban; story in Planning (first active column), empty
+# elsewhere. A pre-migration board still has the legacy Backlog column in front,
+# so pad by one there — vt-repack.sh then densifies whatever shape survives.
+if grep -qxF '| Backlog | Planning | In Progress | Testing | Done |' "$BOARD"; then
+  NEW_ROW="|  | ${CELL} |  |  |  |"
+else
+  NEW_ROW="| ${CELL} |  |  |  |"
+fi
 echo "$NEW_ROW" >> "$BOARD"
 
 # Densify: collapse the appended sparse row into the top-aligned grid.
@@ -121,6 +132,6 @@ case "$BACKDATE" in
   [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]) TS="${BACKDATE}T12:00:00Z" ;;
   *) echo "warn: ignoring invalid --backdate '$BACKDATE' (want YYYY-MM-DD); using now." >&2 ;;
 esac
-printf "%s\t%s\t%s\n" "$TS" "$ID" "∅→backlog" >> "$VT_DIR/transitions.log"
+printf "%s\t%s\t%s\n" "$TS" "$ID" "∅→planning" >> "$VT_DIR/transitions.log"
 
 echo "Created ${ID}: ${TITLE}"

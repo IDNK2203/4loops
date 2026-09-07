@@ -17,15 +17,17 @@ DRIFT_DUE_SOON_DAYS="${VT_DRIFT_DUE_SOON_DAYS:-3}"
 board_rows() {
   [ -f "$BOARD" ] || return 0
   awk -F'|' '
-    /^\| Backlog \| Planning \| In Progress \| Testing \| Done \|$/ { in_k=1; next }
+    BEGIN { split("backlog planning in-progress testing done", st, " ") }
+    $0 == "| Backlog | Planning | In Progress | Testing | Done |" { legacy=1; in_k=1; next }
+    $0 == "| Planning | In Progress | Testing | Done |"           { legacy=0; in_k=1; next }
     in_k && /^\| --/ { in_b=1; next }
     in_b && /^\|/ {
-      for (i=2;i<=6;i++){ c=$i; gsub(/^ +| +$/,"",c);
+      hi = legacy ? 6 : 5
+      for (i=2;i<=hi;i++){ c=$i; gsub(/^ +| +$/,"",c);
         if (c!=""){
-          split("backlog planning in-progress testing done", st, " ")
           id=""
           if (match(c, /\*\*[A-Za-z0-9]+-[0-9]+\*\*/)) id=substr(c, RSTART+2, RLENGTH-4)
-          print id "\t" st[i-1] "\t" c
+          print id "\t" st[legacy ? i-1 : i] "\t" c
           # no break: dense rows hold a story per column, emit them all
         }
       }
@@ -75,7 +77,8 @@ find_stale() {
     done
 }
 
-# Non-done, non-backlog stories untouched >= N days. IDs only (for the rollup).
+# Open pipeline stories (planning/in-progress/testing) untouched >= N days.
+# IDs only (for the rollup).
 # Two safeguards against perceived data loss in weekly_rollover:
 #   - NEVER abandon a story the user is actively focused on (today or week).
 #   - A story with NO transition-log entry is NOT abandoned (unknown age ≠ stale),
@@ -178,8 +181,9 @@ refresh_counts() {
   counts=$(board_rows | awk -F'\t' '
     { n[$2]++ }
     END {
-      printf "Backlog %d · Planning %d · In Progress %d · Testing %d · Done %d",
-        n["backlog"]+0, n["planning"]+0, n["in-progress"]+0, n["testing"]+0, n["done"]+0
+      if (n["backlog"] + 0 > 0) printf "Backlog %d · ", n["backlog"]
+      printf "Planning %d · In Progress %d · Testing %d · Done %d",
+        n["planning"]+0, n["in-progress"]+0, n["testing"]+0, n["done"]+0
     }')
   sed -i.bak "s|^\*\*Counts:\*\*.*|**Counts:** ${counts}|" "$BOARD" 2>/dev/null && rm -f "${BOARD}.bak"
 }
@@ -219,18 +223,29 @@ _remove_board_rows() {
       return 0
     }
     BEGIN { FS="|" }
-    /^\| Backlog \| Planning \| In Progress \| Testing \| Done \|$/ { print; hdr=1; next }
-    hdr && /^\| --/ { print; inbody=1; next }
+    $0 == "| Backlog | Planning | In Progress | Testing | Done |" { legacy=1; hdr=1; next }
+    $0 == "| Planning | In Progress | Testing | Done |"           { legacy=0; hdr=1; next }
+    hdr && /^\| --/ { inbody=1; next }
     inbody && /^\|/ {
-      for (i=2;i<=6;i++){ c=$i; gsub(/^ +| +$/,"",c);
-        if (c!="" && !excluded(c)) cells[i-1, ++n[i-1]]=c }
+      hi = legacy ? 6 : 5
+      for (i=2;i<=hi;i++){ c=$i; gsub(/^ +| +$/,"",c);
+        if (c!="" && !excluded(c)) { col = legacy ? i-1 : i; cells[col, ++n[col]]=c } }
       next
     }
     !inbody { print }
     END {
-      rows=0; for (col=1;col<=5;col++) if (n[col]>rows) rows=n[col]
+      if (!hdr) exit
+      lo = (n[1] + 0 > 0) ? 1 : 2      # the legacy pen survives only while occupied
+      if (lo == 1) {
+        print "| Backlog | Planning | In Progress | Testing | Done |"
+        print "| ------- | -------- | ----------- | ------- | ---- |"
+      } else {
+        print "| Planning | In Progress | Testing | Done |"
+        print "| -------- | ----------- | ------- | ---- |"
+      }
+      rows=0; for (col=lo;col<=5;col++) if (n[col]>rows) rows=n[col]
       for (i=1;i<=rows;i++){ line="|";
-        for (col=1;col<=5;col++){ c=(i<=n[col])?cells[col,i]:""; line=line " " c " |" }
+        for (col=lo;col<=5;col++){ c=(i<=n[col])?cells[col,i]:""; line=line " " c " |" }
         print line }
     }
   ' "$BOARD" > "$tmp" && mv "$tmp" "$BOARD"

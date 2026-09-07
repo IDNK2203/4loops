@@ -7,7 +7,7 @@ user-invocable: true
 argument-hint: "[optional: week items … --today <2–3 of them>]"
 ---
 
-`/week` is the **one-shot orientation**. One print, two picks, done. The priorities file (`current-priorities.md` — Today + Week as `[ ]` / `[x]` checkboxes) is the main surface; the **store** is where week picks come from; the **board** is a separate state check and is **not** part of this flow. There is no Keep / Edit / Skip menu and no Backlog → In-progress shuffle: you look back, choose the week, choose today, and the gate clears.
+`/week` is the **one-shot orientation**. One print, two picks, done. The priorities file (`current-priorities.md` — Today + Week as `[ ]` / `[x]` checkboxes) is the main surface; the **store** is where week picks come from; the **board** is a separate state check and is **not** part of this flow. There is no Keep / Edit / Skip menu and no board shuffle: you look back, choose the week, choose today, and the gate clears.
 
 **Monday (new week):** print file → look back at last week (done vs carried) → set the week from the store (cap 5) → pick today's 2–3 from that week → gate clears.
 **Tue+ (follow-up day):** print file → look back since yesterday → refresh/add to the week only if needed (cap) → pull today's 2–3 from the current week → gate clears.
@@ -65,5 +65,5 @@ The command already prints the file. **The file is the message** — no summary 
 
 - Gate clears after this flow. `/4loops:today` is **not** required; it exists only for a mid-day re-pull from the week.
 - Mid-day changes: `/4loops:prioritize add "<item>"` (today; promotes onto the week) · `/4loops:prioritize week add …` · `/4loops:prioritize done <ID>` checks the box.
-- Board is a separate state check (`/4loops:board`, `/4loops:sync`). A story going Done on the board shows as `[x]` here automatically.
+- Board is a separate state check (`/4loops:board`, `/4loops:sync`). A story going Done on the board shows as `[x]` here automatically. The weekly rollover flushes Done into `archive/<month>/closed.md` at the ISO-week turn — mid-week, `/4loops:manage flush` does the same sweep on demand.
 - Priority is yours — propose, you decide. Mutations ride the rails; never hand-edit `current-priorities.md`.

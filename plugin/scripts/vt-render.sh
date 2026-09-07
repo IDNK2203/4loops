@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # vt-render.sh — pass through header + Projects table, then emit display.
-# Default: single full-width 5-column kanban table with COMPACT cells (ID + title).
+# Default: single full-width 4-column kanban of the ACTIVE pipeline
+# (Planning | In Progress | Testing | Done) with COMPACT cells (ID + title). The
+# board holds committed work moving through state — capture lives in the store.
 # Full why/context is shown in single-state views; --list gives a vertical view.
 #
 # Usage:
@@ -11,8 +13,13 @@
 #   vt-render.sh --project <P>            filter rows to project (combinable)
 #   vt-render.sh --all                    no per-state cap (overrides count)
 #
-# <state> is one of: backlog | planning | in-progress | testing | done
+# <state> is one of: planning | in-progress | testing | done
+# (`backlog` still renders a LEGACY pre-migration column — see vt-migrate-backlog.sh.)
 set -euo pipefail
+
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+# shellcheck source=./vt-board-lib.sh
+source "$SCRIPT_DIR/vt-board-lib.sh"
 
 VT_DIR="${VT_DIR:-./.4loops}"
 BOARD="$VT_DIR/board.md"
@@ -60,6 +67,7 @@ if $PRIO; then
           | sed 's/^· //' | tr '\n' ' ')
 fi
 
+# Canonical state indices: 1 = backlog (legacy only), 2..5 = the active pipeline.
 case "$STATE" in
   backlog)     COL=1 ;;
   planning)    COL=2 ;;
@@ -74,7 +82,7 @@ awk -F'|' \
   -v prio="$PRIO" -v today="$TODAY_N" -v soon="$SOON_N" -v focus=" $FOCUS " \
   '
   BEGIN {
-    state_names[1] = "Backlog"
+    state_names[1] = "Backlog"      # legacy pen — pre-migration boards only
     state_names[2] = "Planning"
     state_names[3] = "In Progress"
     state_names[4] = "Testing"
@@ -110,10 +118,12 @@ awk -F'|' \
     return (length(c) > 44) ? substr(c, 1, 43) "…" : c
   }
 
-  /^\| Backlog \| Planning \| In Progress \| Testing \| Done \|$/ { in_kanban = 1; next }
+  $0 == "| Backlog | Planning | In Progress | Testing | Done |" { legacy = 1; in_kanban = 1; next }
+  $0 == "| Planning | In Progress | Testing | Done |"           { legacy = 0; in_kanban = 1; next }
   in_kanban && /^\| --/ { in_body = 1; next }
   in_body && /^\|/ {
-    for (i = 2; i <= 6; i++) {
+    hi = legacy ? 6 : 5
+    for (i = 2; i <= hi; i++) {
       cell = $i
       gsub(/^ +| +$/, "", cell)
       if (cell == "") continue
@@ -121,7 +131,7 @@ awk -F'|' \
         pattern = "\\[" project "\\]"
         if (cell !~ pattern) continue
       }
-      idx = i - 1
+      idx = legacy ? i - 1 : i
       cells[idx, ++count[idx]] = cell
     }
     next
@@ -133,7 +143,7 @@ awk -F'|' \
 
     # Vertical list view — state headers + bulleted FULL cells.
     if (list == "true" && col == 0) {
-      for (s = 1; s <= 5; s++) {
+      for (s = 2; s <= 5; s++) {
         print "**" state_names[s] "**"
         n = (count[s] < cap) ? count[s] : cap
         if (n == 0) { print "- _(empty)_"; print ""; continue }
@@ -155,30 +165,33 @@ awk -F'|' \
       exit
     }
 
-    # Full board — single 5-column kanban table with COMPACT cells.
-    print "| Backlog | Planning | In Progress | Testing | Done |"
-    print "| ------- | -------- | ----------- | ------- | ---- |"
-    n1 = (count[1] < cap) ? count[1] : cap
+    # Full board — the ACTIVE pipeline as a 4-column kanban with COMPACT cells.
+    # The legacy Backlog pen is never a column here; it is surfaced as a migration
+    # notice below (and readable with `vt-render.sh backlog`).
+    print "| Planning | In Progress | Testing | Done |"
+    print "| -------- | ----------- | ------- | ---- |"
     n2 = (count[2] < cap) ? count[2] : cap
     n3 = (count[3] < cap) ? count[3] : cap
     n4 = (count[4] < cap) ? count[4] : cap
     n5 = (count[5] < cap) ? count[5] : cap
-    rows = n1
-    if (n2 > rows) rows = n2
+    rows = n2
     if (n3 > rows) rows = n3
     if (n4 > rows) rows = n4
     if (n5 > rows) rows = n5
     if (rows == 0) {
-      print "| _(empty)_ | _(empty)_ | _(empty)_ | _(empty)_ | _(empty)_ |"
+      print "| _(empty)_ | _(empty)_ | _(empty)_ | _(empty)_ |"
     } else {
       for (i = 1; i <= rows; i++) {
-        c1 = (i <= n1) ? compact(cells[1, i], 1) : ""
         c2 = (i <= n2) ? compact(cells[2, i], 2) : ""
         c3 = (i <= n3) ? compact(cells[3, i], 3) : ""
         c4 = (i <= n4) ? compact(cells[4, i], 4) : ""
         c5 = (i <= n5) ? compact(cells[5, i], 5) : ""
-        printf "| %s | %s | %s | %s | %s |\n", c1, c2, c3, c4, c5
+        printf "| %s | %s | %s | %s |\n", c2, c3, c4, c5
       }
     }
   }
 ' "$BOARD"
+
+# A pre-migration board still holding Backlog cells says so once, under the grid —
+# board intake is closed, so those rows need `vt-migrate-backlog.sh`.
+vt_board_backlog_notice "$BOARD"

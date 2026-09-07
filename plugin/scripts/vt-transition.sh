@@ -2,8 +2,11 @@
 # vt-transition.sh <id> <new-state> [--backdate YYYY-MM-DD] [--by <id>]
 #
 # Moves story <id> to <new-state>.
-#   Grid states  (backlog|planning|in-progress|testing|done) — move the cell
-#                within the kanban grid; refresh counts.
+#   Grid states  (planning|in-progress|testing|done) — move the cell within the
+#                kanban grid; refresh counts. The board is the ACTIVE pipeline
+#                only: there is no Backlog target, because board intake is closed
+#                (capture lives in the store). A story already parked in the
+#                LEGACY Backlog column can still be moved OUT of it.
 #   Terminal     (abandoned|superseded) — pull the story OFF the active grid
 #                into archive/<month>/abandoned.md immediately (W2), so dead work
 #                stops cluttering the board without waiting for the weekly rollover.
@@ -28,8 +31,16 @@ done
 BRANCH="${BRANCH//|/│}"
 
 case "$NEW_STATE" in
-  backlog|planning|in-progress|testing|done|abandoned|superseded) ;;
-  *) echo "Invalid state: $NEW_STATE (valid: backlog|planning|in-progress|testing|done|abandoned|superseded)" >&2; exit 1 ;;
+  planning|in-progress|testing|done|abandoned|superseded) ;;
+  backlog)
+    cat >&2 <<'MSG'
+backlog is no longer a board state — the board is the active pipeline
+(Planning → In Progress → Testing → Done) and intake is closed.
+  · park uncommitted work in the store:  vt-store-capture.sh  (lever `later`)
+  · retire dead work:                    vt-transition.sh <id> abandoned
+MSG
+    exit 2 ;;
+  *) echo "Invalid state: $NEW_STATE (valid: planning|in-progress|testing|done|abandoned|superseded)" >&2; exit 1 ;;
 esac
 
 VT_DIR="${VT_DIR:-./.4loops}"
@@ -79,8 +90,9 @@ if [ "$NEW_STATE" = "abandoned" ] || [ "$NEW_STATE" = "superseded" ]; then
 fi
 
 # ── Grid states: move the cell within the kanban ──────────────────────────────
+# Canonical column indices: 1 = legacy Backlog, 2..5 = the active pipeline.
 case "$NEW_STATE" in
-  backlog) NEW_COL=1 ;; planning) NEW_COL=2 ;; in-progress) NEW_COL=3 ;; testing) NEW_COL=4 ;; done) NEW_COL=5 ;;
+  planning) NEW_COL=2 ;; in-progress) NEW_COL=3 ;; testing) NEW_COL=4 ;; done) NEW_COL=5 ;;
 esac
 case "$OLD_STATE" in
   backlog) OLD_COL=1 ;; planning) OLD_COL=2 ;; in-progress) OLD_COL=3 ;; testing) OLD_COL=4 ;; done) OLD_COL=5 ;;
@@ -95,10 +107,12 @@ fi
 # can't just replace the row — we re-grid the whole body.
 awk -v id="$ID" -v newcol="$NEW_COL" -v branch="$BRANCH" '
   BEGIN { FS = "|" }
-  /^\| Backlog \| Planning \| In Progress \| Testing \| Done \|$/ { print; hdr = 1; next }
-  hdr && /^\| --/ { print; inbody = 1; next }
+  $0 == "| Backlog | Planning | In Progress | Testing | Done |" { legacy = 1; hdr = 1; next }
+  $0 == "| Planning | In Progress | Testing | Done |"           { legacy = 0; hdr = 1; next }
+  hdr && /^\| --/ { inbody = 1; next }
   inbody && /^\|/ {
-    for (i = 2; i <= 6; i++) {
+    hi = legacy ? 6 : 5
+    for (i = 2; i <= hi; i++) {
       c = $i; gsub(/^ +| +$/, "", c)
       if (c == "") continue
       if (index(c, "**" id "**") > 0) {
@@ -110,7 +124,7 @@ awk -v id="$ID" -v newcol="$NEW_COL" -v branch="$BRANCH" '
           c = c " — branch: " branch
         }
       } else {
-        col = i - 1
+        col = legacy ? i - 1 : i
       }
       cells[col, ++n[col]] = c
     }
@@ -118,11 +132,20 @@ awk -v id="$ID" -v newcol="$NEW_COL" -v branch="$BRANCH" '
   }
   !inbody { print }
   END {
+    if (!hdr) exit
+    lo = (n[1] + 0 > 0) ? 1 : 2         # the legacy pen survives only while occupied
+    if (lo == 1) {
+      print "| Backlog | Planning | In Progress | Testing | Done |"
+      print "| ------- | -------- | ----------- | ------- | ---- |"
+    } else {
+      print "| Planning | In Progress | Testing | Done |"
+      print "| -------- | ----------- | ------- | ---- |"
+    }
     rows = 0
-    for (col = 1; col <= 5; col++) if (n[col] > rows) rows = n[col]
+    for (col = lo; col <= 5; col++) if (n[col] > rows) rows = n[col]
     for (i = 1; i <= rows; i++) {
       line = "|"
-      for (col = 1; col <= 5; col++) {
+      for (col = lo; col <= 5; col++) {
         c = (i <= n[col]) ? cells[col, i] : ""
         line = line " " c " |"
       }

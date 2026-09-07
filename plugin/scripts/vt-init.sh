@@ -17,7 +17,7 @@ if [ ! -f "$VT_DIR/board.md" ]; then
   cat > "$VT_DIR/board.md" <<'EOF'
 # 4loops
 
-**Counts:** Backlog 0 · Planning 0 · In Progress 0 · Testing 0 · Done 0
+**Counts:** Planning 0 · In Progress 0 · Testing 0 · Done 0
 
 ## Projects
 
@@ -26,8 +26,8 @@ if [ ! -f "$VT_DIR/board.md" ]; then
 
 ---
 
-| Backlog | Planning | In Progress | Testing | Done |
-| ------- | -------- | ----------- | ------- | ---- |
+| Planning | In Progress | Testing | Done |
+| -------- | ----------- | ------- | ---- |
 EOF
 fi
 

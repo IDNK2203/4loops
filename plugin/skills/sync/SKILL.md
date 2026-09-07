@@ -61,8 +61,9 @@ For each thing the user says, classify the intent and run the matching rail. The
 
 | They say… | Intent | Rail |
 | --- | --- | --- |
-| "new task: X", "I need to Y", "add Z" | **capture** | `printf '…\t…\n' \| vt-store-capture.sh` (+ `vt-store-expire.sh --activate-only`) — detached `.4loops/store/`, not board Backlog |
-| "start X", "X is in progress / testing / done" | **move state** | `vt-transition.sh <id> <in-progress\|testing\|done>` |
+| "new task: X", "I need to Y", "add Z" | **capture** | `printf '…\t…\n' \| vt-store-capture.sh` (+ `vt-store-expire.sh --activate-only`) — detached `.4loops/store/`. The board has no intake column |
+| "start X", "X is in progress / testing / done" | **move state** | `vt-transition.sh <id> <planning\|in-progress\|testing\|done>` |
+| "that title is wrong", "X and Y are the same thing", "that row shouldn't exist" | **task CRUD** | `vt-edit.sh <id> --title/--why/--context …` · `vt-merge.sh <from> <into>` · `vt-remove.sh <id>` |
 | "focus on X", "bump X to the top", "add X to today" | **prioritize** | `vt-priority.sh add <id\|"text"…>` (or `set …` to replace). Free text lands in the store (`lever=today`) and straight onto Today — and onto the Week if it wasn't there (today ⊆ week; today 2–3, week ≤5 — a refusal carries the arithmetic). `week add …` for the week's list |
 | "take X off today", "deprioritize X" | **prioritize** | `vt-priority.sh drop <id…>` (a CAP goes back to `lever=later` — logged, not deleted) |
 | "X is done" (a CAP / priority item, not a board story) | **check the box** | `vt-priority.sh done <id…>` — `[x]` on today + week; a board story going Done shows `[x]` on its own via `vt-transition.sh` |
@@ -79,7 +80,7 @@ After running, re-render proof and keep it tight:
 - **type** = `dev` unless the wording is exploratory ("spike", "figure out", "decide", "explore") → `modeling`.
 - **deadline** = set it when stated or implied ("by Friday", "before the demo") as `YYYY-MM-DD`; else none.
 - **priority** = only if the user states it ("high", "top", "today"). New work lands in the **detached store** (`.4loops/store/`, state `captured`→`active`);
-  don't auto-prioritize and don't draft onto board Backlog — capture and prioritize are separate acts, and priority stays the user's.
+  don't auto-prioritize and don't draft onto the board — capture and prioritize are separate acts, and priority stays the user's.
 - **project** = the sole project by default; infer from context when several; ask only if truly ambiguous.
 
 **Batch it.** If the user rattles off several things at once ("metrics is done, start the pricing
@@ -102,3 +103,6 @@ the board already reflects everything, because every change rode a rail.
   week). `/sync` is the talk-don't-click path in between. Same rails underneath.
 - The rails underneath (`vt-store-capture.sh` for new work, `vt-transition.sh`, `vt-priority.sh`; `vt-draft.sh` only for intentional board drafts) are the same ones the
   rituals use; talking here just drives them conversationally instead of via checkboxes.
+- The board is **active state only** — Planning → In Progress → Testing → Done. There is no Backlog
+  target: uncommitted work stays in the store, and dead work retires via `abandoned` / `superseded`.
+  Lifecycle beyond state moves (edit · merge · remove · Done flush · key rename) lives in `/manage`.

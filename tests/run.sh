@@ -142,9 +142,9 @@ for t in a b c d e; do bash "$S/vt-draft.sh" T "$t" >/dev/null; done
 bash "$S/vt-transition.sh" T-002 in-progress >/dev/null
 bash "$S/vt-transition.sh" T-003 testing >/dev/null
 bash "$S/vt-transition.sh" T-004 in-progress >/dev/null
-# 5 stories: backlog {T-001,T-005}, in-progress {T-002,T-004}, testing {T-003}.
+# 5 stories: planning {T-001,T-005}, in-progress {T-002,T-004}, testing {T-003}.
 # Dense grid → 2 body rows (max column height). A staircase would be 5.
-NR=$(awk '/^\| Backlog \| Planning/{b=1;getline;next} b&&/^\|/{c++} END{print c+0}' "$VT_DIR/board.md")
+NR=$(awk '/^\| Planning \| In Progress/{b=1;getline;next} b&&/^\|/{c++} END{print c+0}' "$VT_DIR/board.md")
 NSTORIES=$(grep -oE 'T-00[1-5]' "$VT_DIR/board.md" | wc -l | tr -d ' ')
 ck "dense: body rows = max col height (2)"       '[ '"$NR"' -eq 2 ]'
 ck "dense: all 5 stories retained (no loss)"      '[ '"$NSTORIES"' -eq 5 ]'
@@ -234,7 +234,7 @@ unset VT_DIR
 echo "════ 7. Ship-prep fixes (P0-011) ════"
 W7=$(mktemp -d); export VT_DIR="$W7/.4loops"
 MO=$(date +%Y-%m)
-bash "$S/vt-draft.sh" T "just a backlog item" >/dev/null
+bash "$S/vt-draft.sh" T "just a parked item" >/dev/null
 # shellcheck source=/dev/null
 source "$S/vt-priorities-lib.sh"; source "$S/vt-drift-lib.sh"
 weekly_rollover >/dev/null 2>&1
@@ -386,7 +386,7 @@ ck "arrange: drafts the dev story"             'grep -q "ship the thing" "$VT_DI
 ck "arrange: drafts the modeling story"        'grep -q "model the flow" "$VT_DIR/board.md"'
 ck "arrange: preserves type=modeling"          'grep "model the flow" "$VT_DIR/board.md" | grep -q "type: modeling"'
 ck "arrange: applies deadline from TSV"        'grep "ship the thing" "$VT_DIR/board.md" | grep -q "due: 2026-07-15"'
-ck "arrange: both land in Backlog (2 rows)"    '[ "$(grep -cE "ship the thing|model the flow" "$VT_DIR/board.md")" -ge 2 ]'
+ck "arrange: both land in Planning (2 rows)"   '[ "$(grep -cE "ship the thing|model the flow" "$VT_DIR/board.md")" -ge 2 ]'
 ck "capture: skill is user-invoked only"       'grep -q "disable-model-invocation: true" "$PLUGIN/skills/capture/SKILL.md"'
 unset VT_DIR
 
@@ -558,7 +558,7 @@ ck "draft --branch: reverse story_id_by_branch"   '[ "$(story_id_by_branch feat/
 ck "draft default: branch-free (back-compat)"     '[ -z "$(story_branch "$NID")" ]'
 ck "branch: stripped from story_title"            '! printf "%s" "$(story_title "$BID")" | grep -q branch'
 ck "branch: hidden in compact board view"         '! bash "$S/vt-render.sh" | grep -q "branch:"'
-ck "branch: shown in single-state FULL view"      'bash "$S/vt-render.sh" backlog | grep -q "branch: feat/seam"'
+ck "branch: shown in single-state FULL view"      'bash "$S/vt-render.sh" planning | grep -q "branch: feat/seam"'
 # Bind at the in-progress transition (the chosen UX: branch known when work starts).
 TID=$(bash "$S/vt-draft.sh" P0 "bind on start" | grep -oE 'P0-[0-9]+')
 bash "$S/vt-transition.sh" "$TID" in-progress --branch feat/start >/dev/null
@@ -580,14 +580,14 @@ unset VT_DIR
 echo "════ 23. v2.5 Track A: detached store + expiry state machine ════"
 W23=$(mktemp -d); export VT_DIR="$W23/.4loops"
 bash "$S/vt-init.sh" >/dev/null
-# Capture does not touch board Backlog
+# Capture does not touch the board at all
 BOARD_BEFORE=$(wc -l < "$VT_DIR/board.md" | tr -d ' ')
 printf 'P0\tStore happy path item\tdev\tpacket-002 evidence\t2026-09-20\n' | bash "$S/vt-store-capture.sh" >/tmp/vt-store-cap-out.txt
 CAP_ID=$(awk '/^captured:/{print $2; exit}' /tmp/vt-store-cap-out.txt)
 BOARD_AFTER=$(wc -l < "$VT_DIR/board.md" | tr -d ' ')
 ck "store-capture: writes CAP id"                 '[ -n "'"$CAP_ID"'" ] && [ -f "$VT_DIR/store/items/'"$CAP_ID"'" ]'
 ck "store-capture: state=captured"                'grep -q "^state=captured$" "$VT_DIR/store/items/'"$CAP_ID"'"'
-ck "store-capture: board unchanged (no Backlog dump)" '[ "'"$BOARD_BEFORE"'" = "'"$BOARD_AFTER"'" ]'
+ck "store-capture: board unchanged (no board dump)"   '[ "'"$BOARD_BEFORE"'" = "'"$BOARD_AFTER"'" ]'
 # Happy path: captured → active
 bash "$S/vt-store-expire.sh" --activate-only >/dev/null
 ck "store-expire: captured → active"              'grep -q "^state=active$" "$VT_DIR/store/items/'"$CAP_ID"'"'
@@ -907,6 +907,135 @@ DCWS=$(printf "%s" "$DCOUT" | grep -o "/tmp/vt-sandbox-beta-realc-[0-9-]*/worksp
 DCO=$(VT_DIR="$DCWS/.4loops" bash "$S/vt-week.sh" --orient)
 ck "sandbox demo c (default): still new-week with a last-week look-back" 'printf "%s" "$DCO" | grep -q "^MODE: new-week" && printf "%s" "$DCO" | grep -q "^Look-back · last week (Week '"$LW"'):" && printf "%s" "$DCO" | grep -q "^TODAY_SUGGESTED: "'
 rm -rf "$(dirname "$MWWS")" "$(dirname "$DCWS")" 2>/dev/null || true
+
+echo
+echo "════ 30. v2.5 Track D: board = pure active state (manage) ════"
+W30=$(mktemp -d); export VT_DIR="$W30/.4loops"
+bash "$S/vt-init.sh" >/dev/null
+ck "board shape: fresh board is the 4-state pipeline"  'grep -qxF "| Planning | In Progress | Testing | Done |" "$VT_DIR/board.md"'
+ck "board shape: no Backlog column"                    '! grep -q "Backlog" "$VT_DIR/board.md"'
+ck "counts: header drops Backlog"                      'grep -q "^\*\*Counts:\*\* Planning 0 · In Progress 0 · Testing 0 · Done 0$" "$VT_DIR/board.md"'
+
+# ── 1. Capture never creates a board cell; a draft is a COMMITMENT → Planning
+B30=$(wc -l < "$VT_DIR/board.md" | tr -d " ")
+printf "P0\tstore-only item\tdev\t\tlater\n" | bash "$S/vt-store-capture.sh" >/dev/null
+ck "capture: board untouched (store owns intake)"      '[ "$(wc -l < "$VT_DIR/board.md" | tr -d " ")" = "'"$B30"'" ]'
+bash "$S/vt-draft.sh" P0 "committed work" "we said we would" >/dev/null
+ck "draft: lands in Planning, not an intake pen"       '[ "$(VT_DIR="$VT_DIR" bash -c "source \"$S/vt-priorities-lib.sh\"; story_state P0-001")" = "planning" ]'
+ck "draft: logs ∅→planning"                            'grep -q "P0-001.*∅→planning" "$VT_DIR/transitions.log"'
+ck "transition: backlog is refused with a pointer"     'O=$(bash "$S/vt-transition.sh" P0-001 backlog 2>&1); [ "$?" != "0" ] || printf "%s" "$O" | grep -q "no longer a board state"'
+
+# ── 2. Done dwell → archive flush (reversible)
+bash "$S/vt-draft.sh" P0 "shipped ages ago" >/dev/null
+bash "$S/vt-draft.sh" P0 "shipped just now" >/dev/null
+bash "$S/vt-transition.sh" P0-002 done --backdate "$D10" >/dev/null
+bash "$S/vt-transition.sh" P0-003 done >/dev/null
+FDRY=$(bash "$S/vt-flush.sh" --dry-run)
+ck "flush dry-run: only the ripe row is listed"        'printf "%s" "$FDRY" | grep -q "P0-002" && ! printf "%s" "$FDRY" | grep -q "P0-003"'
+ck "flush dry-run: changes nothing"                    'grep -q "P0-002" "$VT_DIR/board.md"'
+bash "$S/vt-flush.sh" >/dev/null
+MO30=$(date +%Y-%m)
+ck "flush: ripe Done row leaves the grid"              '! grep -q "P0-002" "$VT_DIR/board.md"'
+ck "flush: still-dwelling Done row stays"              'grep -q "P0-003" "$VT_DIR/board.md"'
+ck "flush: archive gains the row"                      'grep -q "P0-002" "$VT_DIR/archive/'"$MO30"'/closed.md"'
+ck "flush: logged as done→archived"                    'grep -q "P0-002.*done→archived" "$VT_DIR/transitions.log"'
+bash "$S/vt-flush.sh" --restore P0-002 >/dev/null
+ck "flush --restore: row is back on the board"         'grep -q "P0-002" "$VT_DIR/board.md"'
+ck "flush --restore: archive record is kept (append-only)" 'grep -q "P0-002" "$VT_DIR/archive/'"$MO30"'/closed.md"'
+ck "flush: --dwell 0 takes the whole column"           'bash "$S/vt-flush.sh" --all >/dev/null; ! grep -qE "P0-002|P0-003" "$VT_DIR/board.md"'
+ck "close --flush: wired to the same rail"             'bash "$S/vt-close.sh" --flush --dry-run | grep -q "flush"'
+unset VT_DIR
+
+# ── 3. Task CRUD (P0-048): edit · merge · remove, proven by re-render from disk
+W31=$(mktemp -d); export VT_DIR="$W31/.4loops"
+bash "$S/vt-draft.sh" WEB "Wire metrics" "shell is empty" "web-app/src/D.jsx" --deadline 2026-10-01 >/dev/null
+bash "$S/vt-draft.sh" WEB "Metrics wiring dup" >/dev/null
+bash "$S/vt-draft.sh" WEB "typo row" >/dev/null
+bash "$S/vt-transition.sh" WEB-001 in-progress >/dev/null
+bash "$S/vt-edit.sh" WEB-001 --title "Wire up the live metrics panel" --why "dashboard shell is empty" >/dev/null
+ck "edit: new title is on disk"                        'grep -q "Wire up the live metrics panel" "$VT_DIR/board.md"'
+ck "edit: new why is on disk"                          'grep -q "why: dashboard shell is empty" "$VT_DIR/board.md"'
+ck "edit: state is untouched (content ≠ transition)"   '[ "$(VT_DIR="$VT_DIR" bash -c "source \"$S/vt-priorities-lib.sh\"; story_state WEB-001")" = "in-progress" ]'
+ck "edit: deadline + context survive a title change"   'grep -q "due: 2026-10-01" "$VT_DIR/board.md" && grep -q "context: \[D\](web-app/src/D.jsx)" "$VT_DIR/board.md"'
+ck "edit: --clear drops a field"                       'bash "$S/vt-edit.sh" WEB-001 --clear due >/dev/null; ! grep -q "due: 2026-10-01" "$VT_DIR/board.md"'
+bash "$S/vt-merge.sh" WEB-002 WEB-001 >/dev/null
+ck "merge: the folded story leaves the grid"           '! grep -q "\\*\\*WEB-002\\*\\*" "$VT_DIR/board.md"'
+ck "merge: survivor records what it absorbed"          'grep -q "merged WEB-002: Metrics wiring dup" "$VT_DIR/board.md"'
+ck "merge: survivor keeps its column"                  '[ "$(VT_DIR="$VT_DIR" bash -c "source \"$S/vt-priorities-lib.sh\"; story_state WEB-001")" = "in-progress" ]'
+ck "merge: archived, so it is reversible"              'grep -q "WEB-002" "$VT_DIR/archive/'"$MO30"'/merged.md"'
+bash "$S/vt-remove.sh" WEB-003 --reason "mis-capture" >/dev/null
+ck "remove: row is off the board"                      '! grep -q "WEB-003" "$VT_DIR/board.md"'
+ck "remove: archived with its reason"                  'grep -q "mis-capture" "$VT_DIR/archive/'"$MO30"'/removed.md"'
+ck "remove: restorable"                                'bash "$S/vt-flush.sh" --restore WEB-003 --to planning >/dev/null; grep -q "WEB-003" "$VT_DIR/board.md"'
+ck "CRUD proof: re-render from disk shows the edits"   'bash "$S/vt-render.sh" in-progress | grep -q "Wire up the live metrics panel" && bash "$S/vt-render.sh" in-progress | grep -q "merged WEB-002"'
+ck "cell rewrite: the row keeps exactly 4 columns"     '[ "$(awk -F"|" "/[*][*]WEB-001[*][*]/{print NF; exit}" "$VT_DIR/board.md")" = "6" ]'
+
+# ── 4. Key ops (P0-049): rename carries IDs, counter and trail; collisions refused
+bash "$S/vt-key.sh" rename WEB APP >/dev/null
+ck "key rename: board cells re-tagged"                 'grep -q "\[APP\] \*\*APP-001\*\*" "$VT_DIR/board.md"'
+ck "key rename: old key is gone"                       '! grep -q "WEB-" "$VT_DIR/board.md"'
+ck "key rename: Projects table row moved"              'grep -q "^| APP | " "$VT_DIR/board.md"'
+ck "key rename: ID counter carried over"               '[ -f "$VT_DIR/.ids/APP.counter" ] && [ ! -f "$VT_DIR/.ids/WEB.counter" ]'
+ck "key rename: archive trail follows"                 'grep -q "APP-002" "$VT_DIR/archive/'"$MO30"'/merged.md"'
+ck "key rename: next draft continues the sequence"     'bash "$S/vt-draft.sh" APP "next one" | grep -q "APP-004"'
+ck "key rename: collision refused"                     'bash "$S/vt-draft.sh" ZZ x >/dev/null; ! bash "$S/vt-key.sh" rename APP ZZ 2>/dev/null'
+ck "key ops: abandon still archives"                   'bash "$S/vt-transition.sh" APP-004 abandoned >/dev/null; grep -q "APP-004" "$VT_DIR/archive/'"$MO30"'/abandoned.md"'
+unset VT_DIR
+
+# ── 5. Legacy boards: readable, migratable, never hand-edited
+W32=$(mktemp -d); export VT_DIR="$W32/.4loops"; mkdir -p "$VT_DIR/.ids" "$VT_DIR/archive"; : > "$VT_DIR/transitions.log"
+cat > "$VT_DIR/board.md" <<EOF
+# 4loops
+
+**Counts:** Backlog 2 · Planning 0 · In Progress 1 · Testing 0 · Done 0
+
+## Projects
+
+| Key | Project | Repo |
+| --- | ------- | ---- |
+| WEB | web-app | web-app |
+
+---
+
+| Backlog | Planning | In Progress | Testing | Done |
+| ------- | -------- | ----------- | ------- | ---- |
+| [WEB] **WEB-001** parked copy — why: stale |  | [WEB] **WEB-003** in flight |  |  |
+| [WEB] **WEB-002** parked spike — type: modeling — due: 2026-10-01 |  |  |  |  |
+EOF
+echo 3 > "$VT_DIR/.ids/WEB.counter"
+ck "legacy: a 5-column board still parses"             '[ "$(VT_DIR="$VT_DIR" bash -c "source \"$S/vt-priorities-lib.sh\"; story_state WEB-001")" = "backlog" ]'
+ck "legacy: render never shows Backlog as a column"    '! bash "$S/vt-render.sh" | grep -q "^| Backlog |"'
+ck "legacy: render surfaces the migration notice"      'bash "$S/vt-render.sh" | grep -q "still sit in the legacy Backlog column"'
+MDRY=$(bash "$S/vt-migrate-backlog.sh" --dry-run)
+ck "migrate dry-run: lists both parked stories"        'printf "%s" "$MDRY" | grep -q "WEB-001" && printf "%s" "$MDRY" | grep -q "WEB-002"'
+ck "migrate dry-run: touches nothing"                  'grep -q "WEB-001" "$VT_DIR/board.md"'
+bash "$S/vt-migrate-backlog.sh" --to planning --only WEB-001 >/dev/null
+ck "migrate --to planning: committed work is promoted" '[ "$(VT_DIR="$VT_DIR" bash -c "source \"$S/vt-priorities-lib.sh\"; story_state WEB-001")" = "planning" ]'
+bash "$S/vt-migrate-backlog.sh" >/dev/null
+ck "migrate --to store: the rest becomes store items"  'grep -rq "title=parked spike" "$VT_DIR/store/items/"'
+ck "migrate: store item lands on lever later"          'grep -rq "^lever=later$" "$VT_DIR/store/items/"'
+ck "migrate: deadline survives the move"               'grep -rq "^deadline=2026-10-01$" "$VT_DIR/store/items/"'
+ck "migrate: an archive record makes it reversible"    'grep -q "WEB-002" "$VT_DIR/archive/'"$MO30"'/migrated.md"'
+ck "migrate: the Backlog column is gone"               'grep -qxF "| Planning | In Progress | Testing | Done |" "$VT_DIR/board.md" && ! grep -q "Backlog" "$VT_DIR/board.md"'
+ck "migrate: in-flight story is untouched"             '[ "$(VT_DIR="$VT_DIR" bash -c "source \"$S/vt-priorities-lib.sh\"; story_state WEB-003")" = "in-progress" ]'
+ck "migrate: counts drop the Backlog segment"          'grep -q "^\*\*Counts:\*\* Planning 1 · In Progress 1 · Testing 0 · Done 0$" "$VT_DIR/board.md"'
+ck "migrate: re-running is a clean no-op"              'bash "$S/vt-migrate-backlog.sh" | grep -q "already has no Backlog column"'
+unset VT_DIR
+
+# ── 6. The rails say so: no skill sends intake to the board
+ck "manage: offers no Backlog target"                  '! grep -qE "^- \`/manage <id> .*backlog" "$PLUGIN/skills/manage/SKILL.md"'
+ck "manage: documents the CRUD + flush + key rails"    'grep -q "vt-edit.sh" "$PLUGIN/skills/manage/SKILL.md" && grep -q "vt-merge.sh" "$PLUGIN/skills/manage/SKILL.md" && grep -q "vt-remove.sh" "$PLUGIN/skills/manage/SKILL.md" && grep -q "vt-flush.sh" "$PLUGIN/skills/manage/SKILL.md" && grep -q "vt-key.sh" "$PLUGIN/skills/manage/SKILL.md"'
+ck "manage: documents the migration path"              'grep -q "vt-migrate-backlog.sh" "$PLUGIN/skills/manage/SKILL.md"'
+ck "board skill: describes the 4-column pipeline"      'grep -q "Planning | In Progress | Testing | Done" "$PLUGIN/skills/board/SKILL.md"'
+# The new lifecycle rails are board writers — they must sit in the capability table,
+# or the bash gate would fail open and let an unprompted agent drive them.
+( source "$S/vt-guard-lib.sh"
+  for r in vt-edit vt-merge vt-remove vt-flush vt-key vt-migrate-backlog; do
+    [ "$(vt_rail_tier "$r")" = "mutate" ] || exit 1
+    vt_cap_allows manage "$(vt_rail_tier "$r")" || exit 1
+    vt_cap_allows "" "$(vt_rail_tier "$r")" && exit 1
+  done; exit 0 ) && TIER_OK=1 || TIER_OK=0
+ck "guard: Track D rails are mutate-tier under /manage"  '[ "$TIER_OK" = "1" ]'
 
 echo "════ RESULT: $P passed, $F failed ════"
 [ "$F" -eq 0 ]

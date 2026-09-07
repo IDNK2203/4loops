@@ -95,7 +95,7 @@ to: see the bypass section below.)
 
 ## Track B — A new week, mid-flight (render → week-before-day → `/nav`)  ·  `beta-day5`
 
-A configured, populated board — stories across all five states, real deadlines (one overdue, two due
+A configured, populated board — stories across all four active states, real deadlines (one overdue, two due
 soon), a ◆ modeling story — but **no focus set, on a fresh ISO week**. You're picking the week back up.
 (Think: starting the week on a board that's already full — so the week ritual comes first.)
 

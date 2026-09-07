@@ -1,6 +1,6 @@
 ---
 name: prioritize
-description: Thin, focus-only escape for mid-flight priority edits — add / set / drop items on today or the week, check a box done, and change store levers (urgent|today|later). Today adds promote onto the week (today ⊆ week); week ≤ 5 open; today 2–3. Free text lands in the store on the spot. Never drafts onto board Backlog.
+description: Thin, focus-only escape for mid-flight priority edits — add / set / drop items on today or the week, check a box done, and change store levers (urgent|today|later). Today adds promote onto the week (today ⊆ week); week ≤ 5 open; today 2–3. Free text lands in the store on the spot. Never drafts onto the board.
 allowed-tools: Bash, AskUserQuestion
 disable-model-invocation: true
 user-invocable: true
@@ -92,7 +92,7 @@ No deadline / impact / resource questions — levers only.
 
 | Situation | Behavior |
 | --- | --- |
-| Urge to dump onto board Backlog | Refuse — new items live in the store |
+| Urge to dump onto the board | Refuse — the board is active state only; new items live in the store |
 | Required capacity form (deadline·impact·resource) | Refuse — parked Track B; levers only |
 | Week as a fourth lever | Not a lever — use `week add` for the week's list |
 | Today item that isn't on the week | Not possible — the rail promotes it onto the week (cap permitting) |

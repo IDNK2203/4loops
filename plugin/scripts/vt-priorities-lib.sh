@@ -155,21 +155,25 @@ iso_week_range() {
 }
 
 # Read current state of a story from board.md.
-# Echoes one of: backlog | planning | in-progress | testing | done | "" (not found)
+# Echoes one of: planning | in-progress | testing | done | "" (not found).
+# `backlog` only comes back on a pre-migration board that still carries the
+# legacy pen — see vt-migrate-backlog.sh.
 story_state() {
   local id="$1"
   [ ! -f "$BOARD" ] && return
   awk -v id="$id" -F'|' '
-    /^\| Backlog \| Planning \| In Progress \| Testing \| Done \|$/ { in_kanban = 1; next }
+    BEGIN { states[1] = "backlog"; states[2] = "planning"; states[3] = "in-progress"
+            states[4] = "testing"; states[5] = "done" }
+    $0 == "| Backlog | Planning | In Progress | Testing | Done |" { legacy = 1; in_kanban = 1; next }
+    $0 == "| Planning | In Progress | Testing | Done |"           { legacy = 0; in_kanban = 1; next }
     in_kanban && /^\| --/ { in_body = 1; next }
     in_body && /^\|/ && index($0, "**" id "**") {
-      for (i = 2; i <= 6; i++) {
+      hi = legacy ? 6 : 5
+      for (i = 2; i <= hi; i++) {
         cell = $i
         gsub(/^ +| +$/, "", cell)
         if (index(cell, "**" id "**")) {
-          states[1] = "backlog"; states[2] = "planning"; states[3] = "in-progress"
-          states[4] = "testing"; states[5] = "done"
-          print states[i-1]
+          print states[legacy ? i - 1 : i]
           exit
         }
       }
@@ -379,12 +383,15 @@ board_ids_in() {
   local want=" $* "
   [ -f "$BOARD" ] || return 0
   awk -F'|' -v want="$want" '
-    BEGIN { names[2]="backlog"; names[3]="planning"; names[4]="in-progress"; names[5]="testing"; names[6]="done" }
-    /^\| Backlog \| Planning \| In Progress \| Testing \| Done \|$/ { in_kanban = 1; next }
+    BEGIN { names[1]="backlog"; names[2]="planning"; names[3]="in-progress"; names[4]="testing"; names[5]="done" }
+    $0 == "| Backlog | Planning | In Progress | Testing | Done |" { legacy = 1; in_kanban = 1; next }
+    $0 == "| Planning | In Progress | Testing | Done |"           { legacy = 0; in_kanban = 1; next }
     in_kanban && /^\| --/ { in_body = 1; next }
     in_body && /^\|/ {
-      for (i = 2; i <= 6; i++) {
-        if (index(want, " " names[i] " ") == 0) continue
+      hi = legacy ? 6 : 5
+      for (i = 2; i <= hi; i++) {
+        col = legacy ? i - 1 : i
+        if (index(want, " " names[col] " ") == 0) continue
         cell = $i; gsub(/^ +| +$/, "", cell)
         if (cell != "" && match(cell, /\*\*[A-Z0-9]+-[0-9]+\*\*/)) print substr(cell, RSTART+2, RLENGTH-4)
       }
@@ -421,7 +428,7 @@ focus_deadline() {
 }
 
 # Short state tag for any focus ID:
-#   board → backlog|planning|in-progress|testing|done|off-board
+#   board → planning|in-progress|testing|done|off-board (backlog: legacy pen only)
 #   store → store·<lever> (live) | store·done | store·expired | store·cleared | store·missing
 focus_state() {
   local id="$1" p st
@@ -447,9 +454,9 @@ focus_alive() {
   esac
 }
 
-# 0 iff the item is still OPEN work — not done and not gone. Backlog counts as
-# open (you may plan to start it this week); done / archived / expired / cleared
-# / off-board do not. This is what the caps count and what carries forward.
+# 0 iff the item is still OPEN work — not done and not gone. A legacy Backlog
+# cell still counts as open until it is migrated; done / archived / expired /
+# cleared / off-board do not. This is what the caps count and what carries forward.
 focus_open() {
   focus_done "$1" && return 1
   case "$(focus_state "$1")" in

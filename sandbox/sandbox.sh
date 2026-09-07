@@ -133,11 +133,12 @@ scaffold_mock() {  # <workspace> — a realistic solo-dev machine, NOT a toy. vt
 
 seed_board() {  # <vt_dir> — drive the REAL vt CLI so seeding exercises it too. v2.1-rich:
   local vtdir="$1"  # types (dev/modeling) + deadlines (computed relative to today, so overdue /
-  local d_over d_soon d_wk d_next  # due-soon ALWAYS fire) + a spread across all five states.
+  local d_over d_soon d_wk d_next d_stale  # due-soon ALWAYS fire) + a spread across the four active states.
   d_over=$(date -v-3d  +%F 2>/dev/null || date -d '3 days ago' +%F)  # already overdue
   d_soon=$(date -v+1d  +%F 2>/dev/null || date -d '1 day'      +%F)  # due tomorrow (due-soon)
   d_wk=$(  date -v+5d  +%F 2>/dev/null || date -d '5 days'     +%F)  # later this week
   d_next=$(date -v+12d +%F 2>/dev/null || date -d '12 days'    +%F)  # next sprint
+  d_stale=$(date -v-9d +%F 2>/dev/null || date -d '9 days ago'  +%F)  # past the 7d Done dwell
   # VT_DIR_QUIET: the seed deliberately points VT_DIR at the sandbox from wherever you ran
   # this script, so the "records are elsewhere" warning is expected noise here — suppress it.
   draft() { VT_DIR="$vtdir" VT_DIR_QUIET=1 bash "$PLUGIN_SCRIPTS/vt-draft.sh"      "$@" >/dev/null; }
@@ -153,12 +154,15 @@ seed_board() {  # <vt_dir> — drive the REAL vt CLI so seeding exercises it too
   draft API "Set up CI"                         ""                              ""              --deadline "$d_wk"
   draft API "Add request logging"
 
-  # spread across states — leaves a believable mid-week board (backlog·planning·in-progress·testing·done)
+  # spread across the ACTIVE pipeline — a believable mid-week board (planning·in-progress·testing·done).
+  # vt-draft lands every story in Planning; there is no Backlog column to dump into.
   move WEB-001 in-progress   # due-soon, actively being worked
   move WEB-003 testing       # OVERDUE + in Testing — a real "deadline slipped" signal
   move API-001 in-progress   # due-soon, the blocker
-  move API-002 planning      # the ◆ modeling decision
   move API-003 done          # CI shipped
+  # API-004 went Done nine days ago — past the 7d dwell, so `/manage flush` has
+  # something ripe to archive while API-003 (today) is still dwelling. Track D demo.
+  move API-004 done --backdate "$d_stale"
 
   # Write a REAL config so the seeded sandbox is an already-configured day-5 workspace
   # (names the projects, sets week-start + gated globs) — otherwise /today/week/task-nav
@@ -279,6 +283,32 @@ Track A/B beta arcs. Evaluate the ONE-SHOT orientation only:
 
   ACCEPT = 2 feels like orientation (look back → this week → today), one shot, no Keep/Edit/Skip
   board theater; the file is checkboxes; board.md untouched throughout.
+
+## Track D walk — the board is pure active state (Packet 008)
+
+Same sandbox, second pass. Here the question is the BOARD, not the orientation: it holds only
+committed work moving through state, and Done is short-lived.
+
+  Seeded for this: four active columns (no Backlog anywhere) · API-004 went Done nine days ago,
+  past the 7-day dwell, while API-003 went Done today and is still dwelling.
+
+  1. /4loops:board → four columns, Planning | In Progress | Testing | Done. There is no intake
+     column to dump into.
+  2. Say "new task: rotate the API keys" in /4loops:sync → it lands in the STORE (CAP-006), and
+     the board does not change. Confirm: ls .4loops/store/items && git diff --stat (board.md clean).
+  3. /4loops:manage flush → dry-run first. API-004 is ripe, API-003 is still dwelling. Run it:
+     Done shrinks, .4loops/archive/<month>/closed.md gains the row. Then
+     vt-flush.sh --restore API-004 puts it back — every exit off this board is reversible.
+  4. Task CRUD: /4loops:manage edit WEB-002 --title "Rewrite the pricing page" ; then
+     /4loops:manage merge <a> <b> or remove <id>. Re-render from disk as the proof.
+  5. Key ops: vt-key.sh rename API SVC → every ID, the Projects row, the counter and the archive
+     trail move together. Renaming onto an existing key is refused (IDs would collide).
+  6. Legacy check: on a board that predates v2.5, vt-migrate-backlog.sh --dry-run shows what would
+     move; without the flag it sends the parked rows to the store on lever \`later\` (or
+     --to planning for work already committed). Never hand-edit board.md.
+
+  ACCEPT = capture never touches the board · no rail offers a Backlog target · Done shrinks on a
+  flush and the archive grows · at least one CRUD path lands and re-renders from disk.
 
 Story runbook: ${REALC_RUNBOOK}
 EOF

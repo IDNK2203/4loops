@@ -16,7 +16,7 @@ User-invoked only (`disable-model-invocation: true`) — the agent can never tri
 | Surface | Role |
 | --- | --- |
 | **`.4loops/store/`** | Capture + expiry + **levers** (THIS command writes here) |
-| **Board Backlog column** | NOT the capture target — do not call `vt-arrange.sh` / `vt-draft.sh` from `/capture` |
+| **The board** | NOT the capture target — it is active state only, with no intake column. Do not call `vt-arrange.sh` / `vt-draft.sh` from `/capture` |
 
 ### Priority levers (default `later`)
 
