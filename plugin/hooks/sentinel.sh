@@ -74,9 +74,9 @@ D="${D}${nl}"
 
 if [ "$TODAY_STALE" = true ]; then
   if [ -z "$TODAY_STAMP" ]; then
-    D="${D}[STALE] No Today focus — run /4loops:today${nl}"
+    D="${D}[STALE] No Today priorities — run /4loops:week (one shot: week + today)${nl}"
   else
-    D="${D}[STALE] Today focus is ${TODAY_STAMP} (today ${ISO_TODAY}) — run /4loops:today${nl}"
+    D="${D}[STALE] Today priorities are from ${TODAY_STAMP} (today ${ISO_TODAY}) — run /4loops:week (since-yesterday look-back, pull today from the week)${nl}"
   fi
 else
   D="${D}Today (${ISO_TODAY})${nl}$(render_focus_lines today || true)${nl}"
@@ -85,9 +85,9 @@ D="${D}${nl}"
 
 if [ "$WEEK_STALE" = true ]; then
   if [ -z "$WEEK_STAMP" ]; then
-    D="${D}[STALE] No Week focus — run /4loops:week${nl}"
+    D="${D}[STALE] No Week priorities — run /4loops:week${nl}"
   else
-    D="${D}[STALE] Week focus is Week ${WEEK_STAMP} (now Week ${ISO_WEEK}) — run /4loops:week, then /4loops:today${nl}"
+    D="${D}[STALE] Week priorities are Week ${WEEK_STAMP} (now Week ${ISO_WEEK}) — run /4loops:week (new week: look back, set week from the store, pick today)${nl}"
   fi
 else
   D="${D}Week ${ISO_WEEK}${nl}$(render_focus_lines week || true)${nl}"

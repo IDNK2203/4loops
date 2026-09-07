@@ -8,7 +8,7 @@ argument-hint: "[optional: say what changed, or just open it and talk]"
 ---
 
 `/sync` is the **conversational, intra-cadence** surface — the high-traffic space *between*
-`/today` and `/week`. You open it once and then **talk**: "new task: add rate limiting, high
+morning orientations (`/week`). You open it once and then **talk**: "new task: add rate limiting, high
 priority", "the metrics endpoint is done", "bump auth to the top", "drop the pricing copy". It
 maps each thing you say to a real board operation and **runs it on the rails** — you never type
 `/capture` / `/manage` / `/prioritize` or remember a state command. The loops (capture · check ·
@@ -63,9 +63,10 @@ For each thing the user says, classify the intent and run the matching rail. The
 | --- | --- | --- |
 | "new task: X", "I need to Y", "add Z" | **capture** | `printf '…\t…\n' \| vt-store-capture.sh` (+ `vt-store-expire.sh --activate-only`) — detached `.4loops/store/`, not board Backlog |
 | "start X", "X is in progress / testing / done" | **move state** | `vt-transition.sh <id> <in-progress\|testing\|done>` |
-| "focus on X", "bump X to the top", "add X to today" | **prioritize** | `vt-priority.sh add <id\|"text"…>` (or `set …` to replace). Free text lands in the store (`lever=today`) and straight into Today — no capture detour. `week add …` for the week's anchors |
+| "focus on X", "bump X to the top", "add X to today" | **prioritize** | `vt-priority.sh add <id\|"text"…>` (or `set …` to replace). Free text lands in the store (`lever=today`) and straight onto Today — and onto the Week if it wasn't there (today ⊆ week; today 2–3, week ≤5 — a refusal carries the arithmetic). `week add …` for the week's list |
 | "take X off today", "deprioritize X" | **prioritize** | `vt-priority.sh drop <id…>` (a CAP goes back to `lever=later` — logged, not deleted) |
-| "what did we do yesterday?", "where was I?" | **orient (read)** | `vt-today.sh --yesterday` · `vt-today.sh --orient` (never gated) |
+| "X is done" (a CAP / priority item, not a board story) | **check the box** | `vt-priority.sh done <id…>` — `[x]` on today + week; a board story going Done shows `[x]` on its own via `vt-transition.sh` |
+| "what did we do yesterday?", "where was I?" | **orient (read)** | `vt-today.sh --yesterday` · `vt-week.sh --print` (the checkbox file) · `vt-today.sh --orient` (never gated) |
 | "drop X", "kill X", "X is dead", "X superseded by Y" | **retire** | `vt-transition.sh <id> abandoned` · `vt-transition.sh <id> superseded --by <id2>` |
 
 After running, re-render proof and keep it tight:
@@ -94,10 +95,10 @@ the board already reflects everything, because every change rode a rail.
 
 ## Notes
 
-- This never lifts the daily/weekly **gate** — that's `/today` / `/week`'s job (the deliberate
-  reconciliation). `/sync` is the lightweight in-between; if focus is stale, nudge the user toward
-  `/today`, but don't block their flow.
-- For the deliberate orientation pass (carry-forward · store pull · week anchors → set focus), that's
-  `/today` / `/week`. `/sync` is the talk-don't-click path in between. Same rails underneath.
+- This never lifts the **gate** — that's `/week`'s job (the one-shot orientation: look-back → week from
+  the store → today's 2–3). `/sync` is the lightweight in-between; if priorities are stale, nudge the
+  user toward `/week`, but don't block their flow.
+- For the deliberate orientation pass, that's `/week` (and `/today` only for a mid-day re-pull from the
+  week). `/sync` is the talk-don't-click path in between. Same rails underneath.
 - The rails underneath (`vt-store-capture.sh` for new work, `vt-transition.sh`, `vt-priority.sh`; `vt-draft.sh` only for intentional board drafts) are the same ones the
   rituals use; talking here just drives them conversationally instead of via checkboxes.

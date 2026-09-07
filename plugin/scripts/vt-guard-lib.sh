@@ -56,9 +56,9 @@ vt_resolve_abs() {
 }
 
 # ── First-run on-ramp (rail-armed state) ─────────────────────────────────────
-# The rail is "armed" once the first ritual (/4loops:today) has run. Until then the
+# The rail is "armed" once the first orientation (/4loops:week) has run. Until then the
 # guard allows (one-time install grace) so a fresh workspace doesn't block from
-# minute one. The sentinel renders the "rail arms after your first /4loops:today"
+# minute one. The sentinel renders the "rail arms after your first /4loops:week"
 # notice during grace. VT_DIR must be set before calling.
 vt_rail_armed() { [ -f "$VT_DIR/.armed" ]; }
 vt_arm_rail()   { : > "$VT_DIR/.armed" 2>/dev/null || true; }
@@ -191,7 +191,7 @@ vt_log_record_override() {
 }
 
 vt_record_deny_reason() {
-  printf '%s' "4loops: the board/store records (board.md / current-priorities.md / store/ / tasks/) are rail-owned — hand-editing desyncs counts + transitions.log. Do NOT hand-edit them yourself. Just talk to /4loops:sync (say what's new, what moved, what's done) and it moves the board for you; or run the rituals /4loops:today and /4loops:week. Hand-editing is the USER's decision alone — only if THEY explicitly ask (it's logged)."
+  printf '%s' "4loops: the board/store records (board.md / current-priorities.md / store/ / tasks/) are rail-owned — hand-editing desyncs counts + transitions.log. Do NOT hand-edit them yourself. Just talk to /4loops:sync (say what's new, what moved, what's done) and it moves the board for you; or run the one-shot orientation /4loops:week. Hand-editing is the USER's decision alone — only if THEY explicitly ask (it's logged)."
 }
 
 # ── Per-session capability grant (v2.4: rails are operator-invoked) ──────────
@@ -240,7 +240,7 @@ vt_rail_tier() {
 }
 
 # Tier for a rail AS INVOKED: the gate-clearing rituals have read-only modes
-# (--orient / --default / --current / --yesterday) that other operator commands
+# (--orient / --default / --current / --yesterday / --print) that other operator commands
 # (/sync, /prioritize, /week) legitimately call to orient — those are never
 # gated. Any other invocation keeps the script's tier. $1 = rail name, $2 = the
 # full command string.
@@ -251,7 +251,7 @@ vt_rail_tier_for() {
       # Every mention of the script in the command must be a read-only mode —
       # a chained `--orient; vt-today.sh P0-1` must NOT ride the read-only pass.
       total=$(printf '%s\n' "$cmd" | grep -oE "${rname}\.sh" | wc -l | tr -d ' ')
-      ro=$(printf '%s\n' "$cmd" | grep -oE "${rname}\.sh\"?[[:space:]]+--(orient|default|current|yesterday)" | wc -l | tr -d ' ')
+      ro=$(printf '%s\n' "$cmd" | grep -oE "${rname}\.sh\"?[[:space:]]+--(orient|default|current|yesterday|print)" | wc -l | tr -d ' ')
       if [ "${total:-0}" -gt 0 ] && [ "$total" -eq "${ro:-0}" ]; then
         printf 'readonly'; return 0
       fi
@@ -278,7 +278,7 @@ vt_cap_allows() {
 
 # Deny directive for a bare rail invocation lacking capability.
 vt_cap_deny_reason() {
-  printf '%s' "4loops: rail scripts (vt-*.sh) are operator-invoked, not for direct agent use. To move the board, the operator runs /4loops:sync (just say what changed); to reconcile, the rituals /4loops:today or /4loops:week. Do NOT call the rail scripts yourself — surface this and ask the operator to invoke the right command. (Read-only render/drift rails are never blocked.)"
+  printf '%s' "4loops: rail scripts (vt-*.sh) are operator-invoked, not for direct agent use. To move the board, the operator runs /4loops:sync (just say what changed); to orient, /4loops:week (one shot). Do NOT call the rail scripts yourself — surface this and ask the operator to invoke the right command. (Read-only render/drift rails are never blocked.)"
 }
 
 # ── Override logging (the only escape — per-action, re-arms next call) ────────
@@ -295,9 +295,9 @@ vt_log_override() {
 vt_gate_directive() {
   local lead
   if ! week_stamp_current "$(read_week_stamp)"; then
-    lead="It's a new week — run /4loops:week (set this week's anchors from what's still alive + the store), then /4loops:today."
+    lead="It's a new week — run /4loops:week: one shot (look back at last week, set this week's ≤5 from the store, pick today's 2–3 from it). That single flow lifts the gate."
   else
-    lead="Today's focus is stale — run /4loops:today to face yesterday's carry-forward and the week's anchors, and set today's 1–3."
+    lead="Today's priorities are stale — run /4loops:week: one shot (look back since yesterday, refresh the week if needed, pull today's 2–3 from it). That single flow lifts the gate."
   fi
   printf '%s' "4loops gate (orientation stale). ${lead} This is orientation, not board churn: no state moves are required to lift it. STOP here — do NOT edit this gated surface, and do NOT work around the gate yourself (no override, no shelling out, no alternate tool). You cannot orient for the user: the rituals are user-invoked by design. Surface this, ask them to run the command above, and wait — that orientation IS their priority-setting and it lifts the gate. Reading, search, and notes (.4loops/, study/, learnings/, inbox/) are never blocked, so do whatever non-gated work you can meanwhile. Bypassing is the USER's decision alone — only if THEY explicitly tell you to (it's logged)."
 }

@@ -52,11 +52,12 @@ if $PRIO; then
   TODAY_N=$(date +%Y%m%d)
   SOON_N=$(date -v+"${DRIFT_DUE_SOON_DAYS:-3}"d +%Y%m%d 2>/dev/null \
            || date -d "today +${DRIFT_DUE_SOON_DAYS:-3} days" +%Y%m%d)
-  # Only the Today *Focus:* line — NOT the in-progress/completed bullets (those would
-  # star finished work too).
-  FOCUS=$(awk '/^## Today/{f=1;next} /^## Week/{f=0} f && /^Focus:/{print; exit}' \
+  # Only the Today section's checkbox lines (`- [ ] ID  title`; legacy `Focus:` line
+  # still read) — never the Week section.
+  FOCUS=$(awk '/^## Today/{f=1;next} /^## Week/{f=0} f && (/^- \[[ xX]\] / || /^Focus:/){print}' \
             "$VT_DIR/current-priorities.md" 2>/dev/null \
-          | grep -oE '[A-Z][A-Z0-9]*-[0-9]+' | tr '\n' ' ')
+          | sed -E 's/^- \[[ xX]\] +//; s/^Focus: //' | grep -oE '^[A-Z][A-Z0-9]*-[0-9]+|· [A-Z][A-Z0-9]*-[0-9]+' \
+          | sed 's/^· //' | tr '\n' ' ')
 fi
 
 case "$STATE" in

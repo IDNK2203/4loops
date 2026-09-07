@@ -61,10 +61,13 @@ workspace/
 ## Real C dogfood (`demo c`)
 
 `bash sandbox/sandbox.sh demo c` = Track B's seeded board + a detached store with levers + a **prior
-Week** (backdated to last ISO week) + **yesterday's Today** — both stale, gate active, so `/4loops:week`
-and `/4loops:today` each open on carry-forward. Already configured; it prints the Real C accept walk and
-writes it to `workspace/DOGFOOD-REAL-C.md`. This is Packet 005 dogfood, not the beta A/B arc — see
-`BETA-WALKTHROUGH.md` → Track C.
+Week at the cap** (5: 4 open + 1 done, backdated to last ISO week) + **yesterday's Today** (2, ⊆ week) —
+both stale, gate active, so the **one-shot `/4loops:week`** opens on a real look-back (1 done · 4 carried,
+1 slot free) and picks today from the week; the gate clears in that single flow. The priorities file is
+plain `[ ]`/`[x]` checkboxes. Already configured; it prints the accept walk and writes it to
+`workspace/DOGFOOD-REAL-C.md`. The launcher pins `VT_DIR` to the sandbox workspace so an inherited
+`VT_DIR` from your shell can never point the rails elsewhere. Packet 006 dogfood, not the beta A/B
+arc — see `BETA-WALKTHROUGH.md` → Track C.
 
 ## The walkthrough (seeded, isolated)
 

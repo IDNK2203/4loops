@@ -38,7 +38,7 @@ sandbox.sh — clean-room workspaces for dogfooding 4loops
 USAGE
   sandbox.sh demo <a|b|c> [--no-launch] [--bypass]   ONE-SHOT: build a fresh, uniquely-named
                                  sandbox — a = empty (onboarding), b = seeded mid-week board,
-                                 c = b + detached store (levers) + a prior Week + yesterday's Today
+                                 c = b + store (levers) + a prior Week at cap + yesterday's Today ⊆ week (Packet 006 one-shot /week)
                                  (both stale → week→week and day→day carry-forward visible), for the
                                  v2.5 Real C orientation loop (/week → /today → /prioritize) —
                                  and launch Claude in it. No prior workspace needed — run any time.
@@ -167,33 +167,32 @@ seed_board() {  # <vt_dir> — drive the REAL vt CLI so seeding exercises it too
   : > "$vtdir/.armed"   # pre-arm: armed + stale focus = gate active, so B1 is demoable immediately
 }
 
-seed_store() {  # <vt_dir> — v2.5 Real C: a lived-in detached store + a stale PRIOR Week (last
-  local vtdir="$1" d_yest d_due dow left lw  # ISO week) + a stale (yesterday) Today focus, so /week and
-  d_yest=$(date -v-1d +%F 2>/dev/null || date -d 'yesterday' +%F)   # /today both open on real carry-forward.
+seed_store() {  # <vt_dir> — v2.5 Packet 006: a lived-in detached store + a stale PRIOR Week (last
+  local vtdir="$1" d_yest d_due dow left lw d_lw  # week) + a stale (yesterday) Today ⊆ that week, so the
+  d_yest=$(date -v-1d +%F 2>/dev/null || date -d 'yesterday' +%F)   # one-shot /week opens on a real look-back.
   # Due date INSIDE the current ISO week (Mon start): +2d, clamped to the week's end; on a
   # Sunday that is today itself (due-by is inclusive), so "due this week" is never empty.
   dow=$(date +%u); left=$((7 - dow)); [ "$left" -gt 2 ] && left=2
   d_due=$(date -v+"${left}"d +%F 2>/dev/null || date -d "${left} days" +%F)
   lw=$(date -v-7d +%V 2>/dev/null || date -d '7 days ago' +%V)      # last ISO week number
-  cap() { printf '%s\n' "$1" | VT_DIR="$vtdir" bash "$PLUGIN_SCRIPTS/vt-store-capture.sh" >/dev/null; }
+  d_lw=$(date -v-7d +%F 2>/dev/null || date -d '7 days ago' +%F)
+  cap() { printf '%s\n' "$1" | VT_DIR="$vtdir" VT_DIR_QUIET=1 bash "$PLUGIN_SCRIPTS/vt-store-capture.sh" >/dev/null; }
   cap "$(printf 'WEB\tFix the login redirect loop\tdev\tsupport thread\turgent')"         # CAP-001 urgent
   cap "$(printf 'API\tRate-limit the metrics endpoint\tdev\tnoisy client\ttoday')"        # CAP-002 today
   cap "$(printf 'WEB\tDraft the launch email\tdev\tmarketing asked\t%s' "$d_due")"         # CAP-003 later, due this week
   cap "$(printf 'API\tSpike: OpenTelemetry vs homegrown tracing\tmodeling\t\t')"          # CAP-004 later
   cap "$(printf 'WEB\tClean up the old dashboard branch\tdev\t\t')"                       # CAP-005 later
-  VT_DIR="$vtdir" bash "$PLUGIN_SCRIPTS/vt-store-expire.sh" --activate-only >/dev/null
-  # Prior Week anchors (board + a CAP) and yesterday's Today focus — written through the real
-  # rails from the workspace cwd (the doc title), then BACKDATED: Week → last ISO week, Today →
-  # yesterday. Both stale ⇒ the orientation gate is ACTIVE on launch, and /week → /today each
-  # open on carry-forward (week carries like day: still-alive anchors + store pull).
-  ( cd "$vtdir/.." && VT_DIR="$vtdir" bash "$PLUGIN_SCRIPTS/vt-week.sh" WEB-001 API-001 WEB-003 CAP-001 >/dev/null )
-  ( cd "$vtdir/.." && VT_DIR="$vtdir" VT_ALLOW_TODAY_FIRST=1 bash "$PLUGIN_SCRIPTS/vt-today.sh" WEB-001 API-001 CAP-002 >/dev/null )
+  VT_DIR="$vtdir" VT_DIR_QUIET=1 bash "$PLUGIN_SCRIPTS/vt-store-expire.sh" --activate-only >/dev/null
+  # PRIOR week (5 = at the cap: 4 still open + API-003 already Done → [x]) and yesterday's Today
+  # (2, both on the week — today ⊆ week). Written through the real one-shot rail, then BACKDATED:
+  # Week → last ISO week, Today → yesterday. Both stale ⇒ the orientation gate is ACTIVE on
+  # launch, and /week opens on "last week: 1 done · 4 carried" with 1 slot free (cap 5).
+  VT_DIR="$vtdir" VT_DIR_QUIET=1 bash "$PLUGIN_SCRIPTS/vt-week.sh" set WEB-001 API-001 WEB-003 API-003 CAP-001 --today WEB-001 API-001 >/dev/null 2>&1
   perl -pi -e "s/^## Week \d+ /## Week $lw /" "$vtdir/current-priorities.md"
   perl -pi -e "s/^## Today \(\d{4}-\d{2}-\d{2}\)/## Today ($d_yest)/" "$vtdir/current-priorities.md"
   perl -pi -e "s/^\d{4}-\d{2}-\d{2}(T\S+\ttoday\t)/${d_yest}\$1/" "$vtdir/priorities.log"
-  d_lw=$(date -v-7d +%F 2>/dev/null || date -d '7 days ago' +%F)
   perl -pi -e "s/^\d{4}-\d{2}-\d{2}(T\S+\tweek\t)/${d_lw}\$1/" "$vtdir/priorities.log"
-  rm -rf "$vtdir/.cleared"; mkdir -p "$vtdir/.cleared"   # stale focus + armed = gate active on launch
+  rm -rf "$vtdir/.cleared"; mkdir -p "$vtdir/.cleared"   # stale stamps + armed = gate active on launch
 }
 
 # The Real C accept walk (Packet 005 dogfood) — printed for `demo c` INSTEAD of the beta A/B
@@ -204,33 +203,36 @@ realc_walk() {  # → stdout (markdown-ish plain text)
   d_yest=$(date -v-1d +%F 2>/dev/null || date -d 'yesterday' +%F)
   lw=$(date -v-7d +%V 2>/dev/null || date -d '7 days ago' +%V)
   cat <<EOF
-# Real C accept walk — Packet 005 dogfood (v2.5 living priorities)
+# Real C accept walk — Packet 006 dogfood (one-shot /week · checkbox priorities)
 
 This sandbox is ALREADY CONFIGURED. Skip /4loops:configure, skip virgin onboarding, skip the
-Track A/B beta arcs. Evaluate the Real C accept path only:
+Track A/B beta arcs. Evaluate the ONE-SHOT orientation only:
 
   Seeded: mid-week board (WEB-*, API-*) · store CAP-001..005 (urgent / today / later, one due this
-  week) · a PRIOR Week (Week ${lw}) with anchors WEB-001 API-001 WEB-003 CAP-001 · yesterday's
-  (${d_yest}) Today focus WEB-001 API-001 CAP-002. Both stamps are stale ⇒ the gate is ACTIVE.
+  week) · a PRIOR Week (Week ${lw}) at the cap — WEB-001 API-001 WEB-003 CAP-001 open, API-003 [x]
+  done · yesterday's (${d_yest}) Today = WEB-001 API-001 (today ⊆ week). Both stamps are stale ⇒
+  the gate is ACTIVE. The priorities file is plain checkboxes: cat .4loops/current-priorities.md
 
   1. Ask Claude to edit web-app/src/components/Dashboard.jsx → DENIED with the ORIENTATION copy
-     ("orientation stale … no state moves are required"). No "move something on the board" nudge.
-  2. /4loops:week  → ONE orientation print, no board dump. WEEK→WEEK CARRY: "Last Week (Week ${lw})
-     anchors — still alive" lists the prior anchors that are still live (WEB-001, API-001, WEB-003,
-     CAP-001); anything finished/retired/expired is called out under honest endings. Then the
-     committed board work and the store pull (urgent · today · due this week). Keep or edit 3–5;
-     free text is allowed and lands in the store.
-  3. /4loops:today → DAY CARRY: "Last Today (${d_yest})" still-alive focus (WEB-001, API-001, CAP-002)
-     + store pull (CAP-001 urgent leads) + "how today meets the week" marks. Commit 1–3; the gate
-     lifts. Step 3 of the skill is an OPTIONAL light state check on focus stories only.
-  4. /4loops:prioritize add "some new thing"  → lands in the store (lever=today) AND in Today, no
-     capture→promote detour. Try 'drop <ID>' too (CAP goes back to later, logged).
-  5. Ask "what did we do yesterday?" (via /4loops:sync) → vt-today.sh --yesterday: last Today's
-     focus + that day's board/store transitions, derived from logs — no per-day archive.
-  6. Optional: cat .4loops/current-priorities.md and .4loops/priorities.log (living doc + history).
+     ("run /4loops:week: one shot … lifts the gate"). No "move something on the board" nudge.
+  2. /4loops:week → ONE print: the checkbox file · LOOK-BACK (last week: 1 done · 4 carried, what
+     moved — no task-state moves) · WEEK PICK from the store (cap 5: 4 open → up to 1 new; urgent
+     CAP-001 is already on, CAP-002 today / CAP-003 due this week are the candidates) · TODAY PICK
+     (2–3 from that week; yesterday's carry first). Two multi-select questions, then ONE rail call
+     (vt-week.sh set … --today …). The file prints back. GATE CLEARS HERE — no /4loops:today needed.
+     Try naming 2 new week items → the rail refuses with the cap arithmetic (4 on → at most 1 new).
+     Try picking a today item that is NOT on the week → it is promoted onto the week (no orphans).
+  3. Re-run /4loops:week later the same day → MODE: follow-up, look-back is "since ${d_yest}", not a
+     week replay; today is a pull from the current week. (This is the Tue+ shape.)
+  4. /4loops:prioritize add "some new thing"  → lands in the store (lever=today) AND on Today AND on
+     the Week (day-add ⇒ week-add). /4loops:prioritize done <ID> → [x] on both lists.
+  5. /4loops:today is OPTIONAL — a mid-day re-pull of 2–3 from the week. It is never required for
+     the gate.
+  6. Ask "what did we do yesterday?" (via /4loops:sync) → vt-today.sh --yesterday.
+  7. cat .4loops/current-priorities.md and .4loops/priorities.log (living checkbox doc + history).
 
-  ACCEPT = 1–5 feel like orientation (last week → this week, yesterday → today), not board
-  reconciliation; board.md is untouched unless YOU chose a state move in step 3.
+  ACCEPT = 2 feels like orientation (look back → this week → today), one shot, no Keep/Edit/Skip
+  board theater; the file is checkboxes; board.md untouched throughout.
 
 Story runbook: ${REALC_RUNBOOK}
 EOF
@@ -393,12 +395,12 @@ cmd_demo() {
   if [ "$launch" = 1 ]; then
     if [ "$bypass" = 1 ]; then
       echo "  launching in BYPASS mode (VT_ALLOW_STALE_GATE=1) — the gate is OFF this whole session…" >&2
-      cd "$ws" && exec env VT_ALLOW_STALE_GATE=1 claude --plugin-dir "$PLUGIN_DIR"
+      cd "$ws" && exec env VT_DIR="$ws/.4loops" VT_ALLOW_STALE_GATE=1 claude --plugin-dir "$PLUGIN_DIR"
     fi
-    echo "  launching Claude Code with the 4loops plugin — type /4loops to see the menu…" >&2
-    cd "$ws" && exec claude --plugin-dir "$PLUGIN_DIR"
+    echo "  launching Claude Code with the 4loops plugin (VT_DIR pinned to $ws/.4loops) — type /4loops to see the menu…" >&2
+    cd "$ws" && exec env VT_DIR="$ws/.4loops" claude --plugin-dir "$PLUGIN_DIR"
   fi
-  echo "  launch:  cd \"$ws\" && claude --plugin-dir \"$PLUGIN_DIR\"" >&2
+  echo "  launch:  cd \"$ws\" && VT_DIR=\"$ws/.4loops\" claude --plugin-dir \"$PLUGIN_DIR\"" >&2
 }
 
 cmd_refresh() {
@@ -441,10 +443,10 @@ cmd_relaunch() {  # reopen a sandbox in a FRESH Claude session (defaults to the 
   ws="$root/workspace"
   if [ "$bypass" = 1 ]; then
     echo "↻ relaunching $(basename "$root") in BYPASS mode (VT_ALLOW_STALE_GATE=1) — gate OFF this session…" >&2
-    cd "$ws" && exec env VT_ALLOW_STALE_GATE=1 claude --plugin-dir "$PLUGIN_DIR"
+    cd "$ws" && exec env VT_DIR="$ws/.4loops" VT_ALLOW_STALE_GATE=1 claude --plugin-dir "$PLUGIN_DIR"
   fi
-  echo "↻ relaunching $(basename "$root") — type /4loops for the menu…" >&2
-  cd "$ws" && exec claude --plugin-dir "$PLUGIN_DIR"
+  echo "↻ relaunching $(basename "$root") (VT_DIR pinned) — type /4loops for the menu…" >&2
+  cd "$ws" && exec env VT_DIR="$ws/.4loops" claude --plugin-dir "$PLUGIN_DIR"
 }
 
 cmd_list() {

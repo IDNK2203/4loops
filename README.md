@@ -15,8 +15,8 @@ The loop has four acts — **capture · check · prioritize · review** — at t
 | Command | What it does |
 | --- | --- |
 | `/4loops:configure` | **First-run setup** (run once): detect your projects, pick a week-start, confirm gated surfaces, spawn this week's focus — and pin your board. |
-| `/4loops:week` | **Weekly ritual** — wider lens; pick done / commit-this-week / retire, set 3–5 anchors. **Run first on a new ISO week** (its context flows into the day; `/today` is blocked until it runs). |
-| `/4loops:today` | **Daily ritual** — prints the board, you pick what started / moved / finished / parks; sets 1–3 focus, lifts the day's gate. Leads with overdue / due-soon. |
+| `/4loops:week` | **The one-shot orientation** — print the checkbox priorities, a light look-back (last week on a new week; since yesterday otherwise), set the week from the store (≤5 open), pick today's 2–3 from it. Gate clears. Run it every morning. |
+| `/4loops:today` | **Mid-day pull from the week** — re-point today's 2–3 from the week's items. Not required for the gate; `/week` already includes the today beat. |
 | `/4loops:nav` | **In-between — just talk.** The intra-cadence loop: open it and speak; it captures, moves state, re-points priority, retires — on the real rails, opening on the priority-annotated board. |
 | `/4loops:board` | Render the raw kanban (keep it pinned — see below). |
 
@@ -31,7 +31,7 @@ Stories carry **type** (`dev` / `modeling`) and an optional **deadline** — the
 - **You hold the key.** Every board-touching command is **user-invoked only** — Claude can't start a reconciliation, capture, or move on its own. The command you type is your consent; nothing happens ambiently.
 - **Operate, never simulate.** Inside `/nav`, every change runs a real rail and **re-renders the board from disk as proof** — and the gate physically blocks hand-editing the board files, so a move can't be faked. If the board didn't change, it didn't happen.
 - **Config first.** Every command requires `/4loops:configure` to have run — a fresh install does nothing until you set it up.
-- **Week before day.** On a new ISO week, `/4loops:week` must run before `/4loops:today` — the weekly anchors flow into the day. `/today` refuses until the week is reconciled.
+- **Today ⊆ week.** Today holds 2–3 items and only from the week (≤5 open, picked from the store); a today add is promoted onto the week. `/4loops:week` is the one-shot orientation every morning; `/4loops:today` is only a mid-day re-pull and refuses on a stale week.
 - **The board can't be hand-edited.** `board.md` / `current-priorities.md` are rail-owned; direct edits are blocked. Like the gate, the override (`VT_ALLOW_RECORD_WRITE=1`) is env-only — the agent can't set it; it edits only through the rails.
 
 ## How it enforces
@@ -80,7 +80,7 @@ Carried forward from **v2.1**: see-then-pick rituals · story types (`dev` / `mo
 /plugin install 4loops
 ```
 
-Then run **`/4loops:configure`** once. It detects your projects, asks for a week-start, confirms the gated surfaces, and spawns this week's focus onto the board — so your first session ends on a board full of *your* work, not an empty template. After that: `/4loops:week` each new week, `/4loops:today` each day, and **`/4loops:nav` to just talk** in between.
+Then run **`/4loops:configure`** once. It detects your projects, asks for a week-start, confirms the gated surfaces, and spawns this week's focus onto the board — so your first session ends on a board full of *your* work, not an empty template. After that: `/4loops:week` each morning (one shot), and **`/4loops:nav` to just talk** in between.
 
 The plugin stays quiet in any workspace without a `.4loops/` directory — install it globally and it only wakes up where you've configured it.
 
