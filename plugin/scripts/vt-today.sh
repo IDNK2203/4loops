@@ -40,6 +40,10 @@ USAGE
     exit 1
     ;;
   *)
+    # Unknown --flags never become free-text items (see vt-week.sh, Packet 009).
+    case "$1" in
+      --*) echo "4loops: vt-today.sh has no ${1} mode (read-only modes: --orient --print --default --current --yesterday)." >&2; exit 2 ;;
+    esac
     # WEEK FIRST (hard): on a new week the one-shot /week sets the week AND today.
     # Bypass for internal/repair use: VT_ALLOW_TODAY_FIRST=1.
     if [ "${VT_ALLOW_TODAY_FIRST:-0}" != "1" ] && ! week_stamp_current "$(read_week_stamp)"; then

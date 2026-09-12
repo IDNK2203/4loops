@@ -11,6 +11,10 @@ argument-hint: "<CAP-ID or describe which capture to promote + deadline/impact/r
 
 User-invoked only (`disable-model-invocation: true`) — the agent can never trigger it on its own.
 
+> **Track B is PAUSED as a product surface** (v2.5 roadmap 2026-09-12). The rails below are real
+> and still work; the scope-doc UX is not being developed further, so treat `/scope` as a
+> power-user hatch, not part of the daily loop. Nothing here is on the capture → week → today path.
+
 ## Where things land (v2.5 Track B)
 
 | Surface | Role |
@@ -25,7 +29,10 @@ Refuse any request to add modeling, architecture, implementation plan, or design
 
 ### Lifecycle note
 
-Scope doc is a **handoff artifact**. Track D removes it on Done; board row becomes the only durable 4loops trace. Track B documents that — does not implement expiry-on-Done.
+Scope doc is a **handoff artifact**. **Nothing removes it automatically** — expiry-on-Done was
+scoped to Track B and never implemented, and Track D (Packet 008: task CRUD · Done flush · key
+ops) did not pick it up. A scope doc under `.4loops/tasks/` outlives its story until you delete
+it by hand; the board row is the durable 4loops trace.
 
 ## Step 0 — Require configuration
 

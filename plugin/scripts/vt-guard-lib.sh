@@ -191,7 +191,7 @@ vt_log_record_override() {
 }
 
 vt_record_deny_reason() {
-  printf '%s' "4loops: the board/store records (board.md / current-priorities.md / store/ / tasks/) are rail-owned — hand-editing desyncs counts + transitions.log. Do NOT hand-edit them yourself. Just talk to /4loops:sync (say what's new, what moved, what's done) and it moves the board for you; or run the one-shot orientation /4loops:week. Hand-editing is the USER's decision alone — only if THEY explicitly ask (it's logged)."
+  printf '%s' "4loops BASH-GATE (rail-owned record — NOT the orientation gate): the board/store records (board.md / current-priorities.md / store/ / tasks/) are rail-owned — hand-editing desyncs counts + transitions.log. Do NOT hand-edit them yourself. Just talk to /4loops:sync (say what's new, what moved, what's done) and it moves the board for you; or run the one-shot orientation /4loops:week. Hand-editing is the USER's decision alone — only if THEY explicitly ask (it's logged)."
 }
 
 # ── Per-session capability grant (v2.4: rails are operator-invoked) ──────────
@@ -242,23 +242,35 @@ vt_rail_tier() {
 }
 
 # Tier for a rail AS INVOKED: the gate-clearing rituals have read-only modes
-# (--orient / --default / --current / --yesterday / --print) that other operator commands
-# (/sync, /prioritize, /week) legitimately call to orient — those are never
-# gated. Any other invocation keeps the script's tier. $1 = rail name, $2 = the
-# full command string.
-vt_rail_tier_for() {
-  local rname="$1" cmd="$2" total ro
-  case "$rname" in
-    vt-today|vt-week)
-      # Every mention of the script in the command must be a read-only mode —
-      # a chained `--orient; vt-today.sh P0-1` must NOT ride the read-only pass.
-      total=$(printf '%s\n' "$cmd" | grep -oE "${rname}\.sh" | wc -l | tr -d ' ')
-      ro=$(printf '%s\n' "$cmd" | grep -oE "${rname}\.sh\"?[[:space:]]+--(orient|default|current|yesterday|print)" | wc -l | tr -d ' ')
-      if [ "${total:-0}" -gt 0 ] && [ "$total" -eq "${ro:-0}" ]; then
-        printf 'readonly'; return 0
-      fi
-      ;;
+# that other operator commands (/sync, /prioritize, /week) legitimately call to
+# orient — those are never gated. Any other invocation keeps the script's tier.
+# $1 = rail name, $2 = the full command string.
+#
+# The mode list is PER RAIL and must match the script's own case dispatch exactly.
+# vt-week.sh has no --yesterday (that lives on vt-today.sh) and its dispatch ends
+# in a catch-all `set|add|*`, so a flag it doesn't know is parsed as a free-text
+# item and WRITES. Listing a mode here that the rail doesn't implement would hand
+# a capability-less agent a write disguised as a read (v2.5 Packet 009).
+vt_rail_readonly_modes() {
+  case "$1" in
+    vt-week)  printf 'orient|default|current|print' ;;
+    vt-today) printf 'orient|default|current|yesterday|print' ;;
+    *)        printf '' ;;
   esac
+}
+
+vt_rail_tier_for() {
+  local rname="$1" cmd="$2" modes total ro
+  modes=$(vt_rail_readonly_modes "$rname")
+  if [ -n "$modes" ]; then
+    # Every mention of the script in the command must be a read-only mode —
+    # a chained `--orient; vt-today.sh P0-1` must NOT ride the read-only pass.
+    total=$(printf '%s\n' "$cmd" | grep -oE "${rname}\.sh" | wc -l | tr -d ' ')
+    ro=$(printf '%s\n' "$cmd" | grep -oE "${rname}\.sh\"?[[:space:]]+--(${modes})([[:space:]]|$)" | wc -l | tr -d ' ')
+    if [ "${total:-0}" -gt 0 ] && [ "$total" -eq "${ro:-0}" ]; then
+      printf 'readonly'; return 0
+    fi
+  fi
   vt_rail_tier "$rname"
 }
 
@@ -280,7 +292,7 @@ vt_cap_allows() {
 
 # Deny directive for a bare rail invocation lacking capability.
 vt_cap_deny_reason() {
-  printf '%s' "4loops: rail scripts (vt-*.sh) are operator-invoked, not for direct agent use. To move the board, the operator runs /4loops:sync (just say what changed); to orient, /4loops:week (one shot). Do NOT call the rail scripts yourself — surface this and ask the operator to invoke the right command. (Read-only render/drift rails are never blocked.)"
+  printf '%s' "4loops BASH-GATE (rail capability — NOT the orientation gate, and NOT a refusal to help): this session has no capability for a mutating vt-*.sh rail. Rails are operator-invoked: a capability is minted only when the USER types a /4loops:<cmd> slash command, and it covers that session. Nothing is stale and no ritual is overdue — you simply were not handed the rail. To move the board, ask the operator to run /4loops:sync (then just say what changed); to orient, /4loops:week (one shot). Do NOT call mutating rail scripts yourself and do NOT work around this. Read-only rails (vt-render / vt-drift / vt-store-list / vt-week --orient|--print / vt-today --orient|--print|--current|--yesterday) are NEVER blocked — run those freely to answer questions."
 }
 
 # ── Override logging (the only escape — per-action, re-arms next call) ────────
@@ -301,7 +313,7 @@ vt_gate_directive() {
   else
     lead="Today's priorities are stale — run /4loops:week: one shot (look back since yesterday, refresh the week if needed, pull today's 2–3 from it). That single flow lifts the gate."
   fi
-  printf '%s' "4loops gate (orientation stale). ${lead} This is orientation, not board churn: no state moves are required to lift it. STOP here — do NOT edit this gated surface, and do NOT work around the gate yourself (no override, no shelling out, no alternate tool). You cannot orient for the user: the rituals are user-invoked by design. Surface this, ask them to run the command above, and wait — that orientation IS their priority-setting and it lifts the gate. Reading, search, and notes (.4loops/, study/, learnings/, inbox/) are never blocked, so do whatever non-gated work you can meanwhile. Bypassing is the USER's decision alone — only if THEY explicitly tell you to (it's logged)."
+  printf '%s' "4loops ORIENTATION GATE — orientation stale (this is the stale-priorities gate, NOT the rail-capability bash-gate). ${lead} This is orientation, not board churn: no state moves are required to lift it. STOP here — do NOT edit this gated surface, and do NOT work around the gate yourself (no override, no shelling out, no alternate tool). You cannot orient for the user: the rituals are user-invoked by design. Surface this, ask them to run the command above, and wait — that orientation IS their priority-setting and it lifts the gate. Reading, search, and notes (.4loops/, study/, learnings/, inbox/) are never blocked, so do whatever non-gated work you can meanwhile. Bypassing is the USER's decision alone — only if THEY explicitly tell you to (it's logged)."
 }
 
 # Emit a PreToolUse deny. Canonical = exit 0 + hookSpecificOutput JSON; falls

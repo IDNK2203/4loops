@@ -12,6 +12,8 @@ argument-hint: "[optional: week items … --today <2–3 of them>]"
 **Monday (new week):** print file → look back at last week (done vs carried) → set the week from the store (cap 5) → pick today's 2–3 from that week → gate clears.
 **Tue+ (follow-up day):** print file → look back since yesterday → refresh/add to the week only if needed (cap) → pull today's 2–3 from the current week → gate clears.
 
+**Invariant:** every `/week` run starts by printing `vt-week.sh --orient` stdout verbatim — priorities file first. No argument, no time of day, and no follow-up mode skips that print.
+
 Rules the rails enforce: week ≤ **5 open** (2 already on → at most 3 new); today **2–3**, **only from the week**; a today pick that isn't on the week is **promoted onto it** (no orphan today items). Free text lands in the store on the spot.
 
 ## Step 0 — Require configuration
@@ -25,7 +27,7 @@ VT="${VT_DIR:-./.4loops}"
 
 If `UNCONFIGURED`, stop: **"No 4loops board is configured here yet — run `/4loops:configure` first."**
 
-## Step 1 — Orient (print ONCE)
+## Step 1 — Orient (print ONCE, ALWAYS — never skipped, never summarized)
 
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/scripts/vt-week.sh" --orient
@@ -39,7 +41,9 @@ Print it once, verbatim — it already contains, in order: the **priorities file
 
 No drift dump, no board render, no prose recap of last week. The look-back is a glance, not a task-state pass — never offer to move a story's state here.
 
-If the user passed items in `$ARGUMENTS`, skip to Step 3 with those (`… --today …` picks today too).
+**This step is unconditional.** Run `--orient` and paste its stdout verbatim *before* any `AskUserQuestion`, and before any write — including when the user already passed items in `$ARGUMENTS`, when you ran `/week` earlier today, and on a follow-up (Tue+) day. The rail is read-only and never gated, so there is never a reason not to run it. Do not paraphrase it, do not summarize it, do not print only the machine lines, and do not substitute `--print`: the `── Priorities ──` block with its `[ ]` / `[x]` checkboxes is the whole point of the command, and the user must see it. If the print is missing, the ritual did not happen.
+
+`$ARGUMENTS` only skips **Step 2** (the two questions) — never Step 1. With items in `$ARGUMENTS`: print Step 1, then go straight to Step 3 with those (`… --today …` picks today too).
 
 ## Step 2 — Two picks (one `AskUserQuestion` each)
 

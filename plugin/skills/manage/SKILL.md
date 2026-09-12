@@ -65,7 +65,8 @@ vt-render.sh --priorities                                # proof — always fini
 ```
 
 Otherwise print the board and offer ONE `AskUserQuestion` with forward-step groups (each story in at
-most one), exactly like `/today`'s reconcile but **without** setting focus or lifting the gate:
+most one). This is a **state pass only** — it never sets today/the week and never lifts the gate
+(that is `/week`'s one shot, and `/today` is only a mid-day re-pull from the week):
 
 1. **"Starting?"** Planning → `in-progress`
 2. **"Moved to testing?"** In Progress → `testing`

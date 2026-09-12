@@ -1037,5 +1037,80 @@ ck "board skill: describes the 4-column pipeline"      'grep -q "Planning | In P
   done; exit 0 ) && TIER_OK=1 || TIER_OK=0
 ck "guard: Track D rails are mutate-tier under /manage"  '[ "$TIER_OK" = "1" ]'
 
+echo "════ 31. v2.5 Packet 009: coherence — /week always prints priorities · matrix invariants ════"
+SK="$PLUGIN/skills"
+# ── the orient rail actually emits the surface the skill promises
+W27=$(mktemp -d); export VT_DIR="$W27/.4loops"
+bash "$S/vt-init.sh" >/dev/null
+bash "$S/vt-config.sh" project P0 "dev-os" dev-os >/dev/null
+printf 'P0\tOrient marker\tdev\tx\ttoday\n' | bash "$S/vt-store-capture.sh" >/dev/null
+bash "$S/vt-store-expire.sh" --activate-only >/dev/null
+O27=$(bash "$S/vt-week.sh" --orient)
+ck "orient: prints the Priorities header (the section Ese missed)"  'printf "%s" "$O27" | grep -q "^── Priorities (current-priorities.md) ──$"'
+ck "orient: Priorities comes BEFORE the look-back"                  '[ "$(printf "%s" "$O27" | grep -n "── Priorities" | cut -d: -f1)" -lt "$(printf "%s" "$O27" | grep -n "── Look-back" | cut -d: -f1)" ]'
+bash "$S/vt-week.sh" set CAP-001 --today CAP-001 >/dev/null 2>&1
+O27B=$(bash "$S/vt-week.sh" --orient)
+ck "orient: checkbox markers are in the print once the file exists"  'printf "%s" "$O27B" | grep -q "^- \[ \] CAP-001  Orient marker$"'
+ck "orient: a second run still prints it (not once-per-day)"         '[ "$(bash "$S/vt-week.sh" --orient | grep -c "── Priorities")" = "1" ]'
+ck "orient: --orient stays readonly-tier even after the week is set"  '[ "$(bash -c "source \"$S/vt-guard-lib.sh\"; vt_rail_tier_for vt-week \"$S/vt-week.sh --orient\"")" = "readonly" ]'
+unset VT_DIR; rm -rf "$W27"
+# ── the /week skill contract: Step 1 is unconditional (the Packet 009 bug)
+ck "week skill: no 'skip to Step 3' shortcut past the orient print"  '! grep -q "skip to Step 3" "$SK/week/SKILL.md"'
+ck "week skill: says Step 1 is unconditional"                        'grep -q "This step is unconditional" "$SK/week/SKILL.md"'
+ck "week skill: \$ARGUMENTS may only skip Step 2"                    'grep -q "only skips \*\*Step 2\*\*" "$SK/week/SKILL.md"'
+ck "week skill: states the never-skip invariant up front"            'grep -q "^\*\*Invariant:\*\* every .*--orient.* stdout verbatim" "$SK/week/SKILL.md"'
+ck "week skill: Step 1 heading carries ALWAYS"                       'grep -q "^## Step 1 — Orient (print ONCE, ALWAYS" "$SK/week/SKILL.md"'
+ck "week skill: the orient call sits before the two picks"           '[ "$(grep -n "vt-week.sh\" --orient" "$SK/week/SKILL.md" | head -1 | cut -d: -f1)" -lt "$(grep -n "^## Step 2 — Two picks" "$SK/week/SKILL.md" | cut -d: -f1)" ]'
+ck "week skill: no AskUserQuestion is described before Step 1"       '[ "$(sed -n "/^---$/,/^---$/!p" "$SK/week/SKILL.md" | grep -n "AskUserQuestion" | head -1 | cut -d: -f1)" -gt "$(sed -n "/^---$/,/^---$/!p" "$SK/week/SKILL.md" | grep -n "^## Step 1 — Orient" | cut -d: -f1)" ]'
+ck "today skill: same rule, no question-skip past the print"         'grep -q "This step is unconditional" "$SK/today/SKILL.md" && ! grep -q "skip the question and go straight to Step 2" "$SK/today/SKILL.md"'
+ck "sync skill: orient prints are unconditional too"                 'grep -q "prints above are unconditional" "$SK/sync/SKILL.md" && ! grep -q "skip straight to step 2 and act on it" "$SK/sync/SKILL.md"'
+# ── invocation-matrix invariants: the SoT table must stay true of the code
+ck "matrix: board is the ONLY model-invokable skill"                 '[ "$(grep -L "disable-model-invocation: true" "$SK"/*/SKILL.md)" = "$SK/board/SKILL.md" ]'
+ck "matrix: every skill is user-invocable"                           '[ "$(grep -l "^user-invocable: true$" "$SK"/*/SKILL.md | wc -l | tr -d " ")" = "$(ls -d "$SK"/*/ | wc -l | tr -d " ")" ]'
+# No rail may fall through vt_rail_tier: an unclassified vt-*.sh is a fail-open
+# hole in the bash gate (empty tier → allowed with no capability).
+( source "$S/vt-guard-lib.sh"
+  for f in "$S"/vt-*.sh; do
+    r=$(basename "$f" .sh); case "$r" in *-lib) continue ;; esac
+    [ -n "$(vt_rail_tier "$r")" ] || { echo "$r" >&2; exit 1; }
+  done; exit 0 ) 2>/tmp/vt27-untiered.txt && TIER27=1 || TIER27=0
+ck "matrix: every non-lib rail has a tier (no bash-gate fail-open)"  '[ "$TIER27" = "1" ]' "untiered: $(cat /tmp/vt27-untiered.txt)"
+ck "matrix: the gate-clearing rails are exactly vt-week + vt-today"  'bash -c "source \"$S/vt-guard-lib.sh\"; [ \"\$(vt_rail_tier vt-week)\" = gateclear-week ] && [ \"\$(vt_rail_tier vt-today)\" = gateclear-today ]"'
+ck "matrix: a capability-less session gets no mutate rail"           'bash -c "source \"$S/vt-guard-lib.sh\"; ! vt_cap_allows \"\" mutate && vt_cap_allows \"\" readonly"'
+ck "matrix: /board mints a cap that unlocks readonly only"           'bash -c "source \"$S/vt-guard-lib.sh\"; vt_cap_allows board readonly && ! vt_cap_allows board mutate && ! vt_cap_allows board gateclear-week"'
+ck "matrix: week cap does not clear the today ritual (and back)"     'bash -c "source \"$S/vt-guard-lib.sh\"; ! vt_cap_allows week gateclear-today && ! vt_cap_allows today gateclear-week"'
+# ── Packet 009 finding: a "read-only" invocation that actually WRITES.
+# vt-week.sh has no --yesterday, and its dispatch ends in a catch-all that treats
+# a bare token as free text — so `vt-week.sh --yesterday` used to create a store
+# item and set the week while vt_rail_tier_for called it readonly (= no capability
+# needed). Both sides are now closed.
+ck "tier: vt-week --yesterday is NOT readonly (the rail has no such mode)"  '[ "$(bash -c "source \"$S/vt-guard-lib.sh\"; vt_rail_tier_for vt-week \"$S/vt-week.sh --yesterday\"")" = "gateclear-week" ]'
+ck "tier: vt-today --yesterday IS readonly (that rail does have it)"        '[ "$(bash -c "source \"$S/vt-guard-lib.sh\"; vt_rail_tier_for vt-today \"$S/vt-today.sh --yesterday\"")" = "readonly" ]'
+ck "tier: a readonly mode glued to more args is not readonly"               '[ "$(bash -c "source \"$S/vt-guard-lib.sh\"; vt_rail_tier_for vt-week \"$S/vt-week.sh --orientX\"")" = "gateclear-week" ]'
+ck "tier: every declared readonly mode is one the rail really dispatches"   'bash -c "source \"$S/vt-guard-lib.sh\"
+  for r in vt-week vt-today; do
+    IFS=\"|\" read -ra ms <<< \"\$(vt_rail_readonly_modes \$r)\"
+    for m in \"\${ms[@]}\"; do grep -q -- \"^  --\$m)\" \"$S/\$r.sh\" || exit 1; done
+  done; exit 0"'
+W31=$(mktemp -d); export VT_DIR="$W31/.4loops"
+bash "$S/vt-init.sh" >/dev/null; bash "$S/vt-config.sh" project P0 "dev-os" dev-os >/dev/null
+bash "$S/vt-week.sh" --yesterday >/dev/null 2>/tmp/vt31-wy.txt; WY_RC=$?
+ck "rail: vt-week --yesterday is refused, not parsed as an item"           '[ "'"$WY_RC"'" = "2" ] && grep -q "has no --yesterday mode" /tmp/vt31-wy.txt'
+ck "rail: the refusal creates nothing (no CAP-001, no week)"               '[ ! -d "$VT_DIR/store/items" ] || [ -z "$(ls -A "$VT_DIR/store/items")" ]'
+bash "$S/vt-today.sh" --bogus >/dev/null 2>/tmp/vt31-tb.txt; TB_RC=$?
+ck "rail: vt-today rejects an unknown flag too"                            '[ "'"$TB_RC"'" = "2" ] && grep -q "has no --bogus mode" /tmp/vt31-tb.txt'
+ck "rail: the known read-only modes still work"                            'bash "$S/vt-week.sh" --print >/dev/null && bash "$S/vt-week.sh" --orient >/dev/null && bash "$S/vt-today.sh" --yesterday >/dev/null'
+unset VT_DIR; rm -rf "$W31"
+# ── deny copy names WHICH gate (Ese: "agent says can't without saying which")
+source "$S/vt-guard-lib.sh"
+ck "deny copy: rail-capability block names the bash-gate"            'vt_cap_deny_reason | grep -q "BASH-GATE (rail capability" && vt_cap_deny_reason | grep -q "NOT the orientation gate"'
+ck "deny copy: rail-capability block says read-only is never blocked" 'vt_cap_deny_reason | grep -q "NEVER blocked"'
+ck "deny copy: rail-record block names the bash-gate"                'vt_record_deny_reason | grep -q "BASH-GATE (rail-owned record"'
+ck "deny copy: orientation gate says it is NOT the bash-gate"        'vt_gate_directive | grep -q "ORIENTATION GATE" && vt_gate_directive | grep -q "NOT the rail-capability bash-gate"'
+# ── audit: no skill still claims a Track B/D behaviour that never shipped
+ck "audit: /scope is marked paused, not live product"                'grep -q "Track B is PAUSED" "$SK/scope/SKILL.md"'
+ck "audit: /scope no longer claims Track D expires the scope doc"    '! grep -q "Track D removes it on Done" "$SK/scope/SKILL.md" && grep -q "Nothing removes it automatically" "$SK/scope/SKILL.md"'
+ck "audit: /manage no longer points at a /today reconcile that is gone" '! grep -q "like \`/today\`'"'"'s reconcile" "$SK/manage/SKILL.md"'
+
 echo "════ RESULT: $P passed, $F failed ════"
 [ "$F" -eq 0 ]

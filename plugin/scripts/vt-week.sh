@@ -100,6 +100,13 @@ case "${1:-}" in
     _commit_week_and_today "$(read_focus week)" "$@"
     ;;
   set|add|*)
+    # An unknown --flag must never fall through to the item parser: the catch-all
+    # below treats a bare token as free text, so `vt-week.sh --yesterday` would
+    # silently CREATE a store item named "--yesterday" and set the week — a write
+    # from something that reads like a read (v2.5 Packet 009).
+    case "${1:-}" in
+      --*) echo "4loops: vt-week.sh has no ${1} mode (read-only modes: --orient --print --default --current; --yesterday lives on vt-today.sh)." >&2; exit 2 ;;
+    esac
     mode=set
     case "${1:-}" in set) shift ;; add) mode=add; shift ;; esac
     [ $# -gt 0 ] || usage

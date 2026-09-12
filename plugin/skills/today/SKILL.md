@@ -35,7 +35,7 @@ week_stamp_current "$(read_week_stamp)" && echo WEEK_OK || echo WEEK_STALE
 - `UNCONFIGURED` → stop: **"No 4loops board is configured here yet — run `/4loops:configure` first."**
 - `WEEK_STALE` → stop: **"It's a new week — run `/4loops:week` (one shot: look back, set the week from the store, pick today's 2–3)."** The rail refuses too (`vt-today.sh` exits 3 on a stale week).
 
-### 1. Orient — print ONCE (no board dump)
+### 1. Orient — print ONCE, ALWAYS (no board dump)
 
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/scripts/vt-today.sh" --orient    # the file · the week to pull from · TODAY_SUGGESTED
@@ -43,7 +43,9 @@ week_stamp_current "$(read_week_stamp)" && echo WEEK_OK || echo WEEK_STALE
 
 Print it once. It is the priorities file plus the week's open items and a `TODAY_SUGGESTED` line (today's open carry first, then urgent, then in-progress; max 3). No drift dump, no board render.
 
-If the user passed items in `$ARGUMENTS`, skip the question and go straight to Step 2 with those.
+**This step is unconditional** — same rule as `/week`. Run `--orient` and paste its stdout verbatim before any `AskUserQuestion` and before any write, including when the user already passed items in `$ARGUMENTS`. The rail is read-only and never gated. Never paraphrase it and never print only `TODAY_SUGGESTED`: the checkbox file is the surface.
+
+`$ARGUMENTS` only skips the **question** in Step 2 — never this print. With items in `$ARGUMENTS`: print Step 1, then run the Step 2 commit directly with those.
 
 ### 2. Pick today (ONE `AskUserQuestion`, `multiSelect: true`)
 

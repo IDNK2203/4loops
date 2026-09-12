@@ -32,7 +32,7 @@ This is non-negotiable. The product dies the moment the board lies.
 3. **Never invent an ID.** Match what the user says to a real story on the board (you printed it in
    step 1). If two stories could match, ask ONE tight question. If none match, say so — don't guess.
 
-## Step 1 — Orient (print ONCE, the priority-annotated board)
+## Step 1 — Orient (print ONCE, ALWAYS — the priority-annotated board)
 
 Require config first:
 
@@ -51,8 +51,9 @@ Otherwise, open on **where the user stands relative to their priorities** — no
 ```
 
 Print this **once**. Lead the eye with **★ focus, then ! overdue / ⏳ due-soon** — that's "where am
-I vs my day/week." Then a single open prompt — **"What's changed?"** — and listen. (If the user
-already said what changed in their invocation args, skip straight to step 2 and act on it.)
+I vs my day/week." Then a single open prompt — **"What's changed?"** — and listen.
+
+**The three prints above are unconditional.** Run them and show the output before any rail operation, including when the user already said what changed in their invocation args — you cannot match an utterance to a real ID without them, and "never invent an ID" depends on it. Invocation args only skip the open prompt: print step 1, then go straight to step 2 and act on what they said.
 
 ## Step 2 — Converse: turn each utterance into one rail operation
 
