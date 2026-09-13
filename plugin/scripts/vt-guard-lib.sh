@@ -291,7 +291,9 @@ vt_rail_tier() {
     # flag) and must not hand the session the board rails as a side effect; and
     # conversely a /4loops:sync grant must not be able to switch the rail off.
     vt-disable) printf 'optout' ;;
-    vt-render|vt-drift|vt-next-id|vt-detect|vt-store-list|vt-scope-list|vt-scope-read) printf 'readonly' ;;
+    # v2.5 Packet 012 (Views) — vt-priorities-print has no mode but the print:
+    # it cats current-priorities.md and returns. Nothing to gate.
+    vt-render|vt-drift|vt-next-id|vt-detect|vt-store-list|vt-scope-list|vt-scope-read|vt-priorities-print) printf 'readonly' ;;
     *) printf '' ;;
   esac
 }

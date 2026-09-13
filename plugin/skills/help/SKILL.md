@@ -5,9 +5,10 @@ allowed-tools: Bash
 user-invocable: true
 ---
 
-`/help` prints the 4loops command map. It is the one **model-invokable** command besides `/board`:
-when the user asks what 4loops can do, wonders which command to type, or hits a gate they don't
-recognise, print this map rather than guessing or improvising a tour.
+`/help` prints the 4loops command map. It is **model-invokable**, as the other read-only views are
+(`/board`, `/priorities`, `/backlog`): when the user asks what 4loops can do, wonders which command
+to type, or hits a gate they don't recognise, print this map rather than guessing or improvising a
+tour.
 
 **Read-only.** No rail mutates here. Do not run a ritual, do not move the board, do not write
 `.4loops/`. Print the map, answer the question, stop.
@@ -16,9 +17,9 @@ recognise, print this map rather than guessing or improvising a tour.
 
 ### 1. Print the map
 
-Reproduce the two tables below (Daily loop, then Board), plus the **two gates** line. One screen —
-don't expand it into a feature essay, and don't drop the gate line: it is the part users are
-actually confused by.
+Reproduce the three tables below (Daily loop, Views, then Board and capture), plus the **two gates**
+line. One screen — don't expand it into a feature essay, and don't drop the gate line: it is the
+part users are actually confused by.
 
 ### 2. Answer the specific question, if there was one
 
@@ -46,12 +47,23 @@ nothing to point at — say nothing.
 | `/4loops:today` | Mid-day re-pull of today's 2–3 from the week. Optional — `/week` already includes the today beat. |
 | `/4loops:prioritize` | Thin focus-only edit between orientations: add / set / drop on today or the week, check a box done, change a store lever. |
 
+**Views** — read-only prints. Never gated, never mutate, and the only commands Claude may open for
+you unprompted:
+
+| Command | What it does |
+| --- | --- |
+| `/4loops:backlog` | **Intake** — store items with their levers, plus any legacy Backlog cells still awaiting migration. |
+| `/4loops:board` | **Pipeline** — the kanban: Planning → In Progress → Testing → Done. |
+| `/4loops:priorities` | **Focus** — today's 2–3 and this week's ≤5, as checkboxes. Shows the file; does not re-orient and does not clear the gate. |
+
+Those three are the intake → pipeline → focus progression: what's captured, what's moving, what
+you're on today.
+
 **Board and capture** — the state side:
 
 | Command | What it does |
 | --- | --- |
 | `/4loops:sync` | **In between, just talk.** Open it once and say what changed ("metrics endpoint is done, add rate limiting"); it captures, moves state and re-prioritises on the real rails. |
-| `/4loops:board` | Render the kanban — Planning → In Progress → Testing → Done. |
 | `/4loops:capture` | Direct brain-dump into the detached store with a lever (`urgent` / `today` / `later`). |
 | `/4loops:manage` | Direct state + lifecycle moves: start / testing / done, edit · merge · remove a task, flush Done, abandon / supersede, rename a project key. |
 
@@ -75,9 +87,10 @@ else is a shortcut for something those two already do.
   **you** typed a `/4loops:*` command this session. Nothing is stale when this fires; the rail simply
   wasn't handed over. One capability per session, **last slash wins** — re-type the command you need.
 
-Read-only rails (`vt-render.sh`, `vt-drift.sh`, `vt-store-list.sh`, `vt-week.sh --orient`,
-`vt-today.sh --orient`) pass both gates with no capability and no fresh orientation. They are never
-blocked.
+Read-only rails (`vt-render.sh`, `vt-drift.sh`, `vt-store-list.sh`, `vt-priorities-print.sh`,
+`vt-week.sh --orient`, `vt-today.sh --orient`) pass both gates with no capability and no fresh
+orientation. They are never blocked — which is what makes the three Views commands above always
+available.
 
 ## Never blocked
 
