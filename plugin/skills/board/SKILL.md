@@ -1,11 +1,16 @@
 ---
 name: board
-description: Render the 4loops board (kanban of stories by state). Default shows full board as a single horizontal 5-column table (Backlog | Planning | In Progress | Testing | Done), 5 rows per state, with compact cells (ID + title). Slicing flags filter to a single state (full why/context), a custom row cap, or a single project; `--list` gives a vertical view (kanban stays default). Use when the user wants to see the current state of their stories.
+description: Render the 4loops board (kanban of stories by state). Default shows the full active pipeline as a single horizontal 4-column table (Planning | In Progress | Testing | Done), 5 rows per state, with compact cells (ID + title). Slicing flags filter to a single state (full why/context), a custom row cap, or a single project; `--list` gives a vertical view (kanban stays default). Use when the user wants to see the current state of their stories.
 allowed-tools: Bash
 user-invocable: true
 ---
 
 Render the 4loops board for the current workspace.
+
+The board is the **active pipeline** — Planning → In Progress → Testing → Done. It is not a capture
+pen: uncommitted work lives in the detached store (`/capture`, `/sync`), and Done is short-lived
+(`vt-flush.sh` archives it after its dwell). If the render ends with a migration notice, the board
+predates v2.5 and still holds cells in a legacy Backlog column — `vt-migrate-backlog.sh` clears it.
 
 ## Usage
 
@@ -18,7 +23,8 @@ Render the 4loops board for the current workspace.
 | `/board --all` | No per-state cap (show every row) |
 | `/board --list` | Vertical list view (state headers + bullets) instead of the kanban table |
 
-`<state>` is one of: `backlog`, `planning`, `in-progress`, `testing`, `done`.
+`<state>` is one of: `planning`, `in-progress`, `testing`, `done`. (`backlog` still renders the
+legacy pre-migration column, so you can see what needs migrating.)
 
 Combine flags freely, e.g.:
 - `/board done 15` — last 15 Done stories
@@ -41,6 +47,12 @@ Build the arg list for the script. Order doesn't matter — the script accepts s
 ### 3. Surface the output
 
 Print the script's stdout **verbatim** as the response — it is a markdown artifact; let it render directly. Do NOT add commentary, summaries, or annotations, and **do NOT reflow the kanban table into a list**: the full-board cells are already compact (ID + title) so the table fits, and `/board --list` is the only list form. The board IS the message.
+
+## Never blocked
+
+`vt-render.sh` is a **read-only rail**: it needs no session capability and the orientation gate
+does not apply to it. Render the board whenever asked — before the morning `/week`, mid-ritual,
+or while some other write is denied. A deny you hit elsewhere is never a reason to refuse this.
 
 ## Errors
 

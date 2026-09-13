@@ -22,9 +22,33 @@ source "$SCRIPT_DIR/../scripts/vt-priorities-lib.sh"
 source "$SCRIPT_DIR/../scripts/vt-guard-lib.sh"
 # shellcheck source=../scripts/vt-drift-lib.sh
 source "$SCRIPT_DIR/../scripts/vt-drift-lib.sh"
+# shellcheck source=../scripts/vt-board-lib.sh
+source "$SCRIPT_DIR/../scripts/vt-board-lib.sh"
 
 # If this workspace doesn't use 4loops, exit silently — don't pollute context.
 [ ! -d "$VT_DIR" ] && exit 0
+
+# v2.5 Packet 010 (Surround): the workspace is opted out. Say so once per session
+# and do nothing else — no rollover, no gate clearing, no GC. The notice is
+# deliberate: a rail that is silently off forever is worse than one that tells you
+# it's off and how to switch it back on.
+if vt_is_disabled; then
+  nl=$'\n'
+  DIS=" ╭◎ ◎╮  4loops · $(basename "$(pwd)")${nl}"
+  DIS="${DIS} ╰─▿─╯  disabled — enforcement OFF for this workspace${nl}${nl}"
+  DIS="${DIS}.4loops/disabled is present, so the orientation gate, the rail-capability${nl}"
+  DIS="${DIS}bash-gate and the prompt nudge all step aside. Your board, priorities,${nl}"
+  DIS="${DIS}store and archive are untouched.${nl}${nl}"
+  DIS="${DIS}Re-enable: rm .4loops/disabled   (or /4loops:disable off)${nl}"
+  DIS="${DIS}Command map: /4loops:help${nl}"
+  if command -v jq >/dev/null 2>&1; then
+    jq -n --arg ctx "$DIS" --arg msg "${nl}${DIS}" \
+      '{hookSpecificOutput: {hookEventName: "SessionStart", additionalContext: $ctx}, systemMessage: $msg}'
+  else
+    printf '%s\n' "$DIS"
+  fi
+  exit 0
+fi
 
 # Read the SessionStart payload; session_id drives gate session-clearing.
 HOOK_INPUT=$(cat 2>/dev/null || printf '{}')
@@ -56,7 +80,8 @@ DRIFT_LINE=$(render_drift || true)
 # none ⇒ a broken separator (hand-edit / markdown formatter). Warn, don't die.
 WARN_LINE=""
 if [ -f "$BOARD" ] \
-   && grep -q '^| Backlog | Planning | In Progress | Testing | Done |$' "$BOARD" 2>/dev/null \
+   && { grep -qxF '| Planning | In Progress | Testing | Done |' "$BOARD" 2>/dev/null \
+        || grep -qxF '| Backlog | Planning | In Progress | Testing | Done |' "$BOARD" 2>/dev/null; } \
    && grep -qE '^\|.*\*\*[A-Za-z0-9]+-[0-9]+\*\*' "$BOARD" 2>/dev/null \
    && [ -z "$(board_rows)" ]; then
   WARN_LINE="[WARN] board.md looks malformed — rows present but unparseable. Check the | --- | separator row."
@@ -74,9 +99,9 @@ D="${D}${nl}"
 
 if [ "$TODAY_STALE" = true ]; then
   if [ -z "$TODAY_STAMP" ]; then
-    D="${D}[STALE] No Today focus — run /4loops:today${nl}"
+    D="${D}[STALE] No Today priorities — run /4loops:week (one shot: week + today)${nl}"
   else
-    D="${D}[STALE] Today focus is ${TODAY_STAMP} (today ${ISO_TODAY}) — run /4loops:today${nl}"
+    D="${D}[STALE] Today priorities are from ${TODAY_STAMP} (today ${ISO_TODAY}) — run /4loops:week (since-yesterday look-back, pull today from the week)${nl}"
   fi
 else
   D="${D}Today (${ISO_TODAY})${nl}$(render_focus_lines today || true)${nl}"
@@ -85,15 +110,20 @@ D="${D}${nl}"
 
 if [ "$WEEK_STALE" = true ]; then
   if [ -z "$WEEK_STAMP" ]; then
-    D="${D}[STALE] No Week focus — run /4loops:week${nl}"
+    D="${D}[STALE] No Week priorities — run /4loops:week${nl}"
   else
-    D="${D}[STALE] Week focus is Week ${WEEK_STAMP} (now Week ${ISO_WEEK}) — run /4loops:week, then /4loops:today${nl}"
+    D="${D}[STALE] Week priorities are Week ${WEEK_STAMP} (now Week ${ISO_WEEK}) — run /4loops:week (new week: look back, set week from the store, pick today)${nl}"
   fi
 else
   D="${D}Week ${ISO_WEEK}${nl}$(render_focus_lines week || true)${nl}"
 fi
 
 [ -n "${DRIFT_LINE:-}" ] && D="${D}${nl}${DRIFT_LINE}${nl}"
+
+# Board intake is closed (v2.5 Track D). A pre-migration board still holding cells
+# in the legacy Backlog pen says so once, here — the fix is a script, not a hand-edit.
+MIGRATE_LINE=$(vt_board_backlog_notice "$BOARD" || true)
+[ -n "${MIGRATE_LINE:-}" ] && D="${D}${MIGRATE_LINE}${nl}"
 
 # --- Session-scoped gate clearing + marker cleanup ------------------------------
 # A session that starts on an already-reconciled day carries its clearance forward

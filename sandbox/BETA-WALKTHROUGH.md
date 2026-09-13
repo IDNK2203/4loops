@@ -22,6 +22,7 @@ uniquely-named* sandbox and drops you straight into a Claude session with the pl
 ```bash
 bash ~/Ship/bls/projects/p0-vibe-table/vibe-table/sandbox/sandbox.sh demo a   # Track A (onboarding)
 bash ~/Ship/bls/projects/p0-vibe-table/vibe-table/sandbox/sandbox.sh demo b   # Track B (mid-week)
+bash …/sandbox/sandbox.sh demo c   # Track C — Real C living priorities (Packet 006 dogfood: one-shot /week; see below)
 ```
 
 Run it any time — even right after `prune`. Each run is a brand-new workspace (timestamped), so you
@@ -94,7 +95,7 @@ to: see the bypass section below.)
 
 ## Track B — A new week, mid-flight (render → week-before-day → `/nav`)  ·  `beta-day5`
 
-A configured, populated board — stories across all five states, real deadlines (one overdue, two due
+A configured, populated board — stories across all four active states, real deadlines (one overdue, two due
 soon), a ◆ modeling story — but **no focus set, on a fresh ISO week**. You're picking the week back up.
 (Think: starting the week on a board that's already full — so the week ritual comes first.)
 
@@ -129,13 +130,50 @@ Does `/nav` ever mis-map or invent — or does it stay honest?
 
 ---
 
+## Track C — Real C living priorities (Packet 006 dogfood, not the beta arc)  ·  `demo c`
+
+```bash
+bash ~/Ship/bls/projects/p0-vibe-table/vibe-table-wt-track-a-capture/sandbox/sandbox.sh demo c
+```
+
+`demo c` is **not** a third beta arc. It builds Track B's seeded board **plus** a detached store
+(CAP-001..005 with `urgent` / `today` / `later` levers, one due this week), a **prior Week at the cap**
+(WEB-001 API-001 WEB-003 CAP-001 open, API-003 `[x]` done — backdated to last ISO week) and
+**yesterday's Today** (WEB-001 API-001, a subset of the week) — both stamps stale, gate active. The
+priorities file is plain checkboxes. The sandbox is already configured: skip `/4loops:configure` and
+the A/B walks. The accept walk is printed at build time and written to `workspace/DOGFOOD-REAL-C.md`;
+the runbook is the story's `tracks/C-prioritize.md`. The heart of it: **`/4loops:week` is one shot** —
+the checkbox file · look-back (last week: 1 done · 4 carried; on a re-run the same day: since
+yesterday) · week pick from the store (cap 5: 4 open → up to 1 new) · today pick (2–3 from the week) ·
+gate clears. No `/4loops:today` needed (it's only a mid-day re-pull). Then `/4loops:prioritize add "…"`
+(lands on today AND the week), `done <ID>` (checks the box), yesterday via `/4loops:sync`, cat the doc.
+The launcher pins `VT_DIR` to the sandbox workspace, so a stale `VT_DIR` in your shell can't redirect
+the rails (the Packet 005 mixup).
+
+### `demo c --midweek` — the Tue+ shape (Packet 007)
+
+```bash
+bash …/sandbox/sandbox.sh demo c --midweek
+```
+
+Same seed, one difference: the **Week stamp stays on the current ISO week** and only **Today** is
+backdated to yesterday. `/4loops:week` opens in `MODE: follow-up` with a **since-yesterday** look-back
+instead of a last-week dump, and the week pick is capped against the week you already have. The gate
+is still ACTIVE on launch (stale Today), so the block → orient → clear walk still holds. Judge it on:
+
+- `MODE: follow-up`, `Look-back · since <yesterday>`, and **no** "Look-back · last week" line
+- the print reaches the machine lines — `WEEK_ACTIVE` / `WEEK_CAP_LEFT` / `WEEK_SUGGESTED` /
+  `TODAY_SUGGESTED` (nothing is marked done in this seed; that empty done-set is what used to crash
+  the orientation before Packet 007)
+- one rail call commits both picks and the gate clears — no `/4loops:today` needed
+
 ## Bypassing the lock — the break-glass (yours alone)
 
 The gate is **un-bypassable by the agent.** When it's blocked, the agent's *only* sanctioned move is to
 stop and ask you to reconcile — it cannot override, shell out, or set the override itself (the override is
 read only from the session's environment, which the agent can't write). Test that directly: with stale
 focus, ask Claude to "just force the edit" or "bypass the gate" — it should refuse and point you to
-`/4loops:today`.
+`/4loops:week`.
 
 The override is **your** break-glass: you start the session with it. One command:
 
@@ -174,7 +212,7 @@ The two tracks above hit all of these — use this as the demo's coverage map:
 | Daily reconcile lifts gate | A8 | retry edit now allowed |
 | Gate un-bypassable by agent; user break-glass | Bypass section | agent refuses; `--bypass` works; `override.log` |
 | Session orientation + drift | B1 | overdue/due-soon lead, ◆ shown |
-| **Week-before-day** | B2 | `/today` refused → `/week` first |
+| **One-shot `/week`** (today ⊆ week, caps) | C | look-back → week from store → today 2–3 → gate clears; `/today` only a mid-day re-pull |
 | Two structured rituals (see-then-pick) | B2 | tick groups, no per-story typing |
 | Retire: abandon / supersede / backdate | B2, B3 | leaves grid → archive |
 | Priority-annotated board (★/!/⏳/◆) | B3 | "where am I vs day/week" |

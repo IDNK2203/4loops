@@ -6,7 +6,8 @@
 # exempt, the surface isn't gated, this session already cleared the gate
 # (carries across midnight/resume), or a logged per-action override is set.
 #
-# FAIL-OPEN: any error → allow (a guard bug must never brick real work).
+# FAIL-OPEN: any error → allow (a guard bug must never brick real work). Also
+# fails open wholesale while the workspace is opted out (.4loops/disabled).
 set -uo pipefail
 
 HOOK_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
@@ -26,6 +27,12 @@ root=$(vt_find_workspace_root "$abs") || exit 0
 [ -z "$root" ] && exit 0            # not a 4loops workspace
 
 export VT_DIR="$root/.4loops"
+
+# v2.5 Packet 010 (Surround): workspace opt-out. This check comes FIRST — ahead
+# of the rail-record protection below — so `/4loops:disable` is a full opt-out
+# and not a half-off rail that still refuses a board hand-edit.
+vt_is_disabled && exit 0
+
 # shellcheck source=../scripts/vt-priorities-lib.sh
 source "$SCRIPTS_DIR/vt-priorities-lib.sh" 2>/dev/null || exit 0
 

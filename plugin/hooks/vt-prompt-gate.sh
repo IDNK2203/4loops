@@ -25,6 +25,7 @@ cwd=$(vt_json_field "$input" '.cwd')
 root=$(vt_find_workspace_root "${cwd:-$PWD}") || exit 0
 [ -z "$root" ] && exit 0
 export VT_DIR="$root/.4loops"
+vt_is_disabled && exit 0             # v2.5 Packet 010: opted out → no nudge
 # shellcheck source=../scripts/vt-priorities-lib.sh
 source "$SCRIPTS_DIR/vt-priorities-lib.sh" 2>/dev/null || exit 0
 

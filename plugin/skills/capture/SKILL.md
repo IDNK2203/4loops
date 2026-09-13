@@ -1,27 +1,56 @@
 ---
 name: capture
-description: Capture escape — brain-dump a batch of work in plain language and it drafts the stories onto the board (with type + deadline). A hidden power-user hatch; the normal way to capture is to just say it in /sync. It captures only — never sets priority, never moves state.
+description: Capture escape — brain-dump a batch of work in plain language and it lands in the detached backlog store with a priority lever (urgent|today|later, default later). A hidden power-user hatch; the normal way to capture is to just say it in /sync. It captures only — never moves board state.
 allowed-tools: Bash, AskUserQuestion
 disable-model-invocation: true
 user-invocable: true
-argument-hint: "<describe the work you want to capture>"
+argument-hint: "<describe the work you want to capture> [lever=today|urgent|later]"
 ---
 
-`/capture` turns a brain-dump into board stories. It is a **thin escape** — the main path is to just
-say what's new in `/sync`, which captures as you talk. This exists for the case you want to dump a
-batch directly. You describe work in plain language; I parse it into stories (with type + deadline)
-and draft them onto the board. **Invoking `/capture` is your go** — I show what I'm capturing, then
-create it. I don't reorganize or reprioritize; capture is all this does.
+`/capture` turns a brain-dump into **detached store** items (off-board) with a **priority lever**. It is a **thin escape** — the main path is to just say what's new in `/sync`, which captures as you talk. This exists for the case you want to dump a batch directly. You describe work in plain language; I parse it into items (with type + optional deadline + optional lever) and write them to `.4loops/store/`. **Invoking `/capture` is your go** — I show what I'm capturing, then create it. I don't reorganize the board; capture is all this does.
 
 User-invoked only (`disable-model-invocation: true`) — the agent can never trigger it on its own.
 
-## Step 0 — Require configuration
+## Where things land (v2.5 Track A + C)
 
-```bash
-[ -f .4loops/config ] && echo CONFIGURED || echo UNCONFIGURED
+| Surface | Role |
+| --- | --- |
+| **`.4loops/store/`** | Capture + expiry + **levers** (THIS command writes here) |
+| **The board** | NOT the capture target — it is active state only, with no intake column. Do not call `vt-arrange.sh` / `vt-draft.sh` from `/capture` |
+
+### Priority levers (default `later`)
+
+| Lever | Meaning |
+| --- | --- |
+| **later** | Parked in store until pulled (DEFAULT on capture) |
+| **today** | In today's focus set — jump straight in at capture if asked |
+| **urgent** | Needs attention now / interrupt |
+
+Week is **not** a fourth lever — use `/week` ritual. No required deadline/impact/resource forms.
+
+### Expiry state machine
+
+```
+captured  →  active  →  expired  →  cleared
+   │            │           │
+   │            │           └─ vt-store-expire.sh --clear / --clear-id
+   │            └─ past TTL (default 14d) via vt-store-expire.sh
+   └─ vt-store-expire.sh (tick activates captured → active)
 ```
 
-If `UNCONFIGURED`, stop: **"No 4loops board here yet — run `/4loops:configure` first."**
+TTL: `VT_STORE_TTL_DAYS` or `store_ttl_days: N` in `.4loops/config` (default 14).
+
+## Step 0 — Require configuration
+
+Honor `VT_DIR` (rails sandbox) — default `./.4loops`:
+
+```bash
+VT="${VT_DIR:-./.4loops}"
+[ -f "$VT/config" ] && echo CONFIGURED || echo UNCONFIGURED
+```
+
+If `UNCONFIGURED`, stop: **"No 4loops board here yet — run `/4loops:configure` first."**  
+Isolated sandbox tip: after `vt-init.sh`, you still need a `config` (run `/4loops:configure` or drop a minimal projects config into `$VT_DIR`). Store scripts already honor `VT_DIR`.
 
 ## Steps
 
@@ -29,18 +58,20 @@ If `UNCONFIGURED`, stop: **"No 4loops board here yet — run `/4loops:configure`
 
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/scripts/vt-render.sh"
-cat .4loops/config 2>/dev/null
+"${CLAUDE_PLUGIN_ROOT}/scripts/vt-store-list.sh" live
+cat "${VT_DIR:-./.4loops}/config" 2>/dev/null
 ```
 
-Read existing projects (Projects table / `config`). One project → that's the default; several → infer per item, ask only if genuinely ambiguous. Note anything already on the board so you don't duplicate it.
+Read existing projects (Projects table / `config`). One project → that's the default; several → infer per item, ask only if genuinely ambiguous. Note anything already in the **store** (and on the board) so you don't duplicate it.
 
-### 2. Parse the blurb into stories
+### 2. Parse the blurb into items
 
 For each discrete work item, infer:
 - **project** — the project key (default to the sole project).
 - **title** — short imperative, no trailing punctuation.
 - **type** — `dev` (fixed, testable) or `modeling` (fluid, emerges). Default `dev`.
-- **deadline** — `YYYY-MM-DD` if the user gave or implied one (e.g. "by Friday"). Optional but encouraged — it's what drives drift later.
+- **deadline** — `YYYY-MM-DD` if the user gave or implied one (e.g. "by Friday"). Optional.
+- **lever** — `urgent` | `today` | `later`. Default **`later`** if omitted. Honor explicit "today" / "urgent" / "for later" in the blurb or `$ARGUMENTS`.
 - **why** / **doc** — one-line rationale / a doc path if mentioned.
 
 ### 3. Show + create (the command was your go)
@@ -48,19 +79,26 @@ For each discrete work item, infer:
 Preview the batch (creates nothing), then create it — no separate confirm gate, since invoking `/capture` is the consent:
 
 ```bash
-# preview
-printf '%s\t%s\t%s\t%s\t%s\n' "<P>" "<title>" "<type>" "<why>" "<YYYY-MM-DD>" ... | "${CLAUDE_PLUGIN_ROOT}/scripts/vt-arrange.sh" --dry-run
-# create
-printf '%s\t%s\t%s\t%s\t%s\n' ... | "${CLAUDE_PLUGIN_ROOT}/scripts/vt-arrange.sh"
-"${CLAUDE_PLUGIN_ROOT}/scripts/vt-render.sh"
+# preview / create — lever forms (bash collapses empty tab fields, so avoid bare \t\tlever):
+#   default later:     P  title  type  why  [due]
+#   lever, no due:     P  title  type  why  today|urgent|later
+#   due + lever:       P  title  type  why  YYYY-MM-DD  today|urgent|later
+#   batch default:     ... | vt-store-capture.sh --lever today
+printf '%s\t%s\t%s\t%s\t%s\n' "<P>" "<title>" "<type>" "<why>" "today" | "${CLAUDE_PLUGIN_ROOT}/scripts/vt-store-capture.sh" --dry-run
+printf '%s\t%s\t%s\t%s\t%s\t%s\n' "<P>" "<title>" "<type>" "<why>" "2026-09-20" "urgent" | "${CLAUDE_PLUGIN_ROOT}/scripts/vt-store-capture.sh"
+# settle captured → active (happy-path tick)
+"${CLAUDE_PLUGIN_ROOT}/scripts/vt-store-expire.sh" --activate-only
+"${CLAUDE_PLUGIN_ROOT}/scripts/vt-store-list.sh" live
 ```
 
-Show the preview to the user as you create — if they immediately object, you've only drafted to Backlog (reversible: `vt-transition.sh <id> abandoned`, or retire it in the next `/4loops:week` prune). If a field was genuinely ambiguous (which project? a date you couldn't infer?), ask ONE tight question before creating.
+Show the preview to the user as you create — if they immediately object, items are only in the store (change lever via `/prioritize`, or force-expire + clear / leave to TTL). If a field was genuinely ambiguous (which project? a date you couldn't infer?), ask ONE tight question before creating.
 
-### 4. Hand priority back
+### 4. Hand priority cadence back
 
-Every story lands in **Backlog**. Do **not** set focus — tell the user to choose what to work on via `/sync` (or `/4loops:prioritize add <id…>`). Priority stays the operator's.
+Every item lands in the **detached store** with its lever. Do **not** draft onto the board — tell the user to change levers / pull into today's focus via `/prioritize` (or `/sync`). Priority stays the operator's. There is no scope-doc step — Track B is dead and its skill was removed (v2.5 Packet 009b).
 
 ## Notes
 
-- TSV fields are tab-separated; titles/why must not contain tabs (the rails sanitize `|`). DUE must be `YYYY-MM-DD` (invalid is dropped with a warning).
+- TSV fields are tab-separated; titles/why must not contain tabs (the rails sanitize `|`). Field 5 = `YYYY-MM-DD` deadline **or** a lever keyword (`urgent|today|later`) when there is no due. Field 6 = lever when field 5 is a date. Or pass `--lever` for the whole batch. Invalid lever → later (+ warn).
+- Store paths: `.4loops/store/items/CAP-NNN` (live), `.4loops/store/cleared/` (after clear), `.4loops/store/transitions.log`.
+- Board `vt-draft` / `vt-arrange` still exist for intentional board drafts — `/capture` must not use them.

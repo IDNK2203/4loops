@@ -5,8 +5,13 @@
 # story IDs (used by the weekly rollover to drop archived stories). Idempotent —
 # repacking an already-dense board is a no-op.
 #
-# Everything above the kanban header (title, Counts, Projects table, ---) and the
-# header+separator are passed through untouched; only the body rows are re-gridded.
+# Shape (v2.5 Track D): the board is the ACTIVE pipeline — Planning | In Progress |
+# Testing | Done. A legacy Backlog column is preserved only while it still holds
+# cells (so repacking is never lossy); the moment it empties, the board is written
+# out in the 4-column shape. `vt-migrate-backlog.sh` is the scripted way off it.
+#
+# Everything above the kanban header (title, Counts, Projects table, ---) is passed
+# through untouched; the header + separator are re-emitted in the surviving shape.
 set -euo pipefail
 
 VT_DIR="${VT_DIR:-./.4loops}"
@@ -24,22 +29,33 @@ awk -v exclude="$EXCLUDE" '
     return 0
   }
   BEGIN { FS = "|" }
-  /^\| Backlog \| Planning \| In Progress \| Testing \| Done \|$/ { print; hdr = 1; next }
-  hdr && /^\| --/ { print; inbody = 1; next }
+  $0 == "| Backlog | Planning | In Progress | Testing | Done |" { legacy = 1; hdr = 1; next }
+  $0 == "| Planning | In Progress | Testing | Done |"           { legacy = 0; hdr = 1; next }
+  hdr && /^\| --/ { inbody = 1; next }
   inbody && /^\|/ {
-    for (i = 2; i <= 6; i++) {
+    hi = legacy ? 6 : 5
+    for (i = 2; i <= hi; i++) {
       c = $i; gsub(/^ +| +$/, "", c)
-      if (c != "" && !excluded(c)) cells[i-1, ++n[i-1]] = c
+      if (c != "" && !excluded(c)) { col = legacy ? i - 1 : i; cells[col, ++n[col]] = c }
     }
     next
   }
   !inbody { print }
   END {
+    if (!hdr) exit                       # no kanban header seen — pass the file through untouched
+    lo = (n[1] + 0 > 0) ? 1 : 2          # keep the legacy pen only while it holds work
+    if (lo == 1) {
+      print "| Backlog | Planning | In Progress | Testing | Done |"
+      print "| ------- | -------- | ----------- | ------- | ---- |"
+    } else {
+      print "| Planning | In Progress | Testing | Done |"
+      print "| -------- | ----------- | ------- | ---- |"
+    }
     rows = 0
-    for (col = 1; col <= 5; col++) if (n[col] > rows) rows = n[col]
+    for (col = lo; col <= 5; col++) if (n[col] > rows) rows = n[col]
     for (i = 1; i <= rows; i++) {
       line = "|"
-      for (col = 1; col <= 5; col++) {
+      for (col = lo; col <= 5; col++) {
         c = (i <= n[col]) ? cells[col, i] : ""
         line = line " " c " |"
       }

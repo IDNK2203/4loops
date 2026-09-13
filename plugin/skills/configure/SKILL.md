@@ -111,7 +111,7 @@ Make the finish a *moment* — the first reconciliation is the aha, so mark it:
    cat .4loops/current-priorities.md
    ```
 3. **Pin-the-board tip** (one line — this is how the loop is meant to be used): **"💡 Keep the board in view — open `.4loops/board.md` and *pin* the tab; in VS Code, right-click the tab → Pin, and toggle Markdown preview (⌘K V) so it's always glanceable. (Terminal: keep a split running `watch` on the board, or just re-run `/4loops:board`.) The loop works best when the board is always on screen."**
-4. One line on the loop, and nothing more: **"From here: `/4loops:today` each day, `/4loops:week` each week (run it first on a new week). You'll see the board and pick what moved — no need to type state commands."**
+4. One line on the loop, and nothing more: **"From here: `/4loops:week` each morning — one shot: a look-back, the week's ≤5 from the store, today's 2–3 from it. Between mornings, just talk in `/4loops:sync` — no need to type state commands."**
 5. Mark the final todo `completed`.
 
 It lives in `.4loops/` at your workspace root and re-renders at the start of every session via the sentinel. **Do not** narrate an on-ramp or feature list — the board they just filled plus that one-line loop *is* the whole message.

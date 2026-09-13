@@ -4,7 +4,7 @@
 # Each stdin line: PROJECT<TAB>TITLE<TAB>TYPE<TAB>WHY<TAB>DUE   (TYPE/WHY/DUE optional).
 # Used by /4loops:arrange AFTER the user confirms the proposed stories — it never
 # decides WHAT to create or HOW to prioritize; it just executes a user-confirmed
-# batch atomically (every item lands in Backlog, the operator sets focus after).
+# batch atomically (every item lands in Planning, the operator sets focus after).
 # --dry-run prints the planned drafts without creating anything (the proposal).
 set -euo pipefail
 
@@ -32,5 +32,5 @@ while IFS=$'\t' read -r proj title type why due || [ -n "${proj:-}" ]; do
 done
 
 if [ "$DRY" = 0 ]; then
-  echo "arranged: drafted ${created} story(ies) into Backlog — set focus with /4loops:today or /4loops:priority."
+  echo "arranged: drafted ${created} story(ies) into Planning — set focus with /4loops:today or /4loops:priority."
 fi

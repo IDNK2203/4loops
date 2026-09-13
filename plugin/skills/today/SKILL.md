@@ -1,66 +1,70 @@
 ---
 name: today
-description: Daily board reconciliation — print the board, then pick (structured) what moved: started / testing / done / park. New work and today's 1–3 focus fall out of it. Leads with overdue / due-soon. Writes the Today stamp, which lifts the focus gate for the day.
+description: Mid-day pull-from-week — re-point today's 2–3 from the current week's items in the living priorities doc (checkboxes). NOT the orientation and NOT required to clear the gate — /week is the one-shot that does both. Use this only when the day changed mid-day.
 allowed-tools: Bash, AskUserQuestion
 disable-model-invocation: true
 user-invocable: true
+argument-hint: "[optional: 2–3 week items to set as today directly]"
 ---
 
-`/today` is the daily **board reconciliation**. You **see the board, then pick what changed** — you don't hand-type `/start`/`/done` per story, and you don't narrate it in prose. The board print is the context; structured selection is how you move things; today's focus falls out. Your selections apply directly (the pick *is* the confirmation). Running it writes today's stamp, which lifts the gate for the day.
+`/today` is the **mid-day pull from the week**. The daily orientation (look-back → week → today → gate clears) is `/4loops:week`, one shot; you do **not** need this command to finish orientation. Reach for it when the day changed mid-day and you want to re-point today's 2–3 from the week's items.
+
+Rules the rails enforce: today **2–3**, **only from the week**; a pick that isn't on the week is **promoted onto it** (week cap 5). Free text lands in the store (`lever=today`) and on both lists. Board is a separate state check — nothing here writes `board.md`.
+
+## Surfaces
+
+| Surface | Role here |
+| --- | --- |
+| **`current-priorities.md`** (Today + Week, `[ ]`/`[x]`) | THE surface — today is a subset of the week |
+| **Store** (`.4loops/store/`, levers `urgent\|today\|later`) | Free text you add lands here with `lever=today` |
+| **Board** | Not part of this — a story going Done shows as `[x]` here on its own |
 
 ## Steps
 
-### 0. Require configuration — and that the week ran first
+### 0. Require configuration — and a current week
+
+Honor `VT_DIR` (rails sandbox) — default `./.4loops`:
 
 ```bash
-[ -f .4loops/config ] && echo CONFIGURED || echo UNCONFIGURED
+VT="${VT_DIR:-./.4loops}"
+[ -f "$VT/config" ] && echo CONFIGURED || echo UNCONFIGURED   # default path: .4loops/config
 source "${CLAUDE_PLUGIN_ROOT}/scripts/vt-priorities-lib.sh"
 week_stamp_current "$(read_week_stamp)" && echo WEEK_OK || echo WEEK_STALE
 ```
 
 - `UNCONFIGURED` → stop: **"No 4loops board is configured here yet — run `/4loops:configure` first."**
-- `WEEK_STALE` → stop: **"It's a new week — run `/4loops:week` first; its anchors flow into today."**
-  This is a hard rule: on a fresh ISO week the weekly reconciliation comes before the daily one
-  (the rail enforces it too — `vt-today.sh` refuses to set focus until the week is current).
+- `WEEK_STALE` → stop: **"It's a new week — run `/4loops:week` (one shot: look back, set the week from the store, pick today's 2–3)."** The rail refuses too (`vt-today.sh` exits 3 on a stale week).
 
-### 1. Orient — print the board ONCE (the context)
+### 1. Orient — print ONCE, ALWAYS (no board dump)
 
 ```bash
-"${CLAUDE_PLUGIN_ROOT}/scripts/vt-render.sh"
-"${CLAUDE_PLUGIN_ROOT}/scripts/vt-drift.sh"          # OVERDUE · DUE-SOON · caps · stale · abandon-candidates
-"${CLAUDE_PLUGIN_ROOT}/scripts/vt-today.sh" --default   # carry-forward → SUGGESTED_FOCUS
-"${CLAUDE_PLUGIN_ROOT}/scripts/vt-today.sh" --current
+"${CLAUDE_PLUGIN_ROOT}/scripts/vt-today.sh" --orient    # the file · the week to pull from · TODAY_SUGGESTED
 ```
 
-Print this once — it's the whole picture you reconcile against (if the user keeps `board.md` pinned, treat it as a refresh, don't re-dump). **Lead with anything overdue / due-soon** — those are the off-plan signals that should shape today.
+Print it once. It is the priorities file plus the week's open items and a `TODAY_SUGGESTED` line (today's open carry first, then urgent, then in-progress; max 3). No drift dump, no board render.
 
-### 2. Reconcile — structured multi-select (state moves HERE)
+**This step is unconditional** — same rule as `/week`. Run `--orient` and paste its stdout verbatim before any `AskUserQuestion` and before any write, including when the user already passed items in `$ARGUMENTS`. The rail is read-only and never gated. Never paraphrase it and never print only `TODAY_SUGGESTED`: the checkbox file is the surface.
 
-Build ONE `AskUserQuestion` with up to **four** `multiSelect: true` groups — each a single forward step along `backlog → in-progress → testing → done`, plus a park escape. Omit any group whose source set is empty. Label every option `ID — title` (mark ◆ modeling, and append `· due <date>`/`· OVERDUE` where it applies, so the deadline is visible at the pick):
+`$ARGUMENTS` only skips the **question** in Step 2 — never this print. With items in `$ARGUMENTS`: print Step 1, then run the Step 2 commit directly with those.
 
-1. **"Starting today?"** — **Backlog** → `vt-transition.sh <id> in-progress`
-2. **"Moved to testing?"** — **In Progress** → `vt-transition.sh <id> testing`
-3. **"Now done?"** — **In Progress + Testing** → `vt-transition.sh <id> done`
-4. **"Park / drop (stale · overdue)?"** — stale + overdue candidates → `vt-transition.sh <id> backlog` (or `abandoned` if truly dropped)
+### 2. Pick today (ONE `AskUserQuestion`, `multiSelect: true`)
 
-(Prefix each with `"${CLAUDE_PLUGIN_ROOT}/scripts/`.) Each story in at most one group. Apply selections in flow order, then **re-render once**. Unselected stays put. All sets empty → skip silently, no churn. Four groups is the `AskUserQuestion` max, so reconcile and focus-set stay two calls; a single-story group needs a `None — leave as is` filler option (≥2 required), treated as a no-op.
-
-**New work** isn't a checkbox — capture it with type + deadline via `/4loops:arrange` (a batch) or one `vt-draft.sh <P> "<title>" "<why>" "<doc>" --type <…> --deadline <YYYY-MM-DD>`. Don't force it into the multi-select.
-
-### 3. Set today's focus (the byproduct)
-
-`AskUserQuestion` (single-select): **Keep `[SUGGESTED_FOCUS]`** / **Edit** (free-text 1–3 via Other) / **Skip**. Bias the suggestion so **overdue / due-soon lead**. Sanity-check IDs against the board.
-
-### 4. Write + show
+Options = the week's open items, `TODAY_SUGGESTED` first, labelled `ID — title`. Ask for **2–3**. New items in plain words via **Other** (quote each as one argument). Then:
 
 ```bash
-"${CLAUDE_PLUGIN_ROOT}/scripts/vt-today.sh" <ID1> <ID2> ...
-cat .4loops/current-priorities.md
+"${CLAUDE_PLUGIN_ROOT}/scripts/vt-today.sh" <2–3 items…>
+"${CLAUDE_PLUGIN_ROOT}/scripts/vt-today.sh" --print
 ```
 
-Preserves the Week section, refreshes slices, **arms the rail**, and records this session cleared when today+week are fresh. The file IS the message.
+- Board IDs (`P0-12`) and store IDs (`CAP-003`) pass through; free text becomes a store item on the spot (`lever=today`) — no `/capture` detour.
+- A pick not on the week is promoted onto the week (the week stamp is left as is); more than 3, or a promotion over the week cap, is refused with the exact arithmetic — trim and re-run.
+- Store levers follow the day (committed CAP → `today`; a `today` CAP left off → `later`, logged). Appends to `priorities.log`, arms the rail, clears the gate when week + today are fresh. **The file is the message.**
 
 ## Notes
 
-- Skip at step 3 → don't write; the gate stays active and re-prompts. Step-2 moves still stand.
-- Priority stays **yours** — propose, you decide. Mutations ride the rails; never hand-edit `board.md`.
+- Nothing selected → no write; nothing else changed.
+- Add one item without re-picking: `/4loops:prioritize add "<item>"`. Check a box: `/4loops:prioritize done <ID>`.
+- "What did we do yesterday?" → `vt-today.sh --yesterday` (last Today's checkboxes + that day's board and store transitions). History lives in `priorities.log` + the two `transitions.log`s.
+- Priority stays **yours** — propose, you decide. Never hand-edit `board.md` / `current-priorities.md`.
+- **Read-only rails are never gated.** `vt-today.sh --orient` / `--print` / `--current` / `--yesterday`, `vt-week.sh --orient`, `vt-render.sh`, `vt-drift.sh`, `vt-store-list.sh` need no capability and no fresh orientation. Run them freely to answer a question — do not claim you are blocked from looking.
+- **A stale gate blocks the codebase, not the board.** Stale orientation stops writes to the gated product surfaces only; board moves ride a separate per-session capability.

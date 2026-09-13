@@ -8,7 +8,7 @@ argument-hint: "[optional: say what changed, or just open it and talk]"
 ---
 
 `/sync` is the **conversational, intra-cadence** surface — the high-traffic space *between*
-`/today` and `/week`. You open it once and then **talk**: "new task: add rate limiting, high
+morning orientations (`/week`). You open it once and then **talk**: "new task: add rate limiting, high
 priority", "the metrics endpoint is done", "bump auth to the top", "drop the pricing copy". It
 maps each thing you say to a real board operation and **runs it on the rails** — you never type
 `/capture` / `/manage` / `/prioritize` or remember a state command. The loops (capture · check ·
@@ -32,7 +32,7 @@ This is non-negotiable. The product dies the moment the board lies.
 3. **Never invent an ID.** Match what the user says to a real story on the board (you printed it in
    step 1). If two stories could match, ask ONE tight question. If none match, say so — don't guess.
 
-## Step 1 — Orient (print ONCE, the priority-annotated board)
+## Step 1 — Orient (print ONCE, ALWAYS — the priority-annotated board)
 
 Require config first:
 
@@ -51,8 +51,9 @@ Otherwise, open on **where the user stands relative to their priorities** — no
 ```
 
 Print this **once**. Lead the eye with **★ focus, then ! overdue / ⏳ due-soon** — that's "where am
-I vs my day/week." Then a single open prompt — **"What's changed?"** — and listen. (If the user
-already said what changed in their invocation args, skip straight to step 2 and act on it.)
+I vs my day/week." Then a single open prompt — **"What's changed?"** — and listen.
+
+**The three prints above are unconditional.** Run them and show the output before any rail operation, including when the user already said what changed in their invocation args — you cannot match an utterance to a real ID without them, and "never invent an ID" depends on it. Invocation args only skip the open prompt: print step 1, then go straight to step 2 and act on what they said.
 
 ## Step 2 — Converse: turn each utterance into one rail operation
 
@@ -61,10 +62,13 @@ For each thing the user says, classify the intent and run the matching rail. The
 
 | They say… | Intent | Rail |
 | --- | --- | --- |
-| "new task: X", "I need to Y", "add Z" | **capture** | `vt-draft.sh <P> "<title>" "<why>" "<doc>" --type <dev\|modeling> --deadline <YYYY-MM-DD>` |
-| "start X", "X is in progress / testing / done" | **move state** | `vt-transition.sh <id> <in-progress\|testing\|done>` |
-| "focus on X", "bump X to the top", "add X to today" | **prioritize** | `vt-priority.sh add <id…>` (or `set <id…>` to replace) |
-| "take X off today", "deprioritize X" | **prioritize** | `vt-priority.sh set <remaining ids…>` |
+| "new task: X", "I need to Y", "add Z" | **capture** | `printf '…\t…\n' \| vt-store-capture.sh` (+ `vt-store-expire.sh --activate-only`) — detached `.4loops/store/`. The board has no intake column |
+| "start X", "X is in progress / testing / done" | **move state** | `vt-transition.sh <id> <planning\|in-progress\|testing\|done>` |
+| "that title is wrong", "X and Y are the same thing", "that row shouldn't exist" | **task CRUD** | `vt-edit.sh <id> --title/--why/--context …` · `vt-merge.sh <from> <into>` · `vt-remove.sh <id>` |
+| "focus on X", "bump X to the top", "add X to today" | **prioritize** | `vt-priority.sh add <id\|"text"…>` (or `set …` to replace). Free text lands in the store (`lever=today`) and straight onto Today — and onto the Week if it wasn't there (today ⊆ week; today 2–3, week ≤5 — a refusal carries the arithmetic). `week add …` for the week's list |
+| "take X off today", "deprioritize X" | **prioritize** | `vt-priority.sh drop <id…>` (a CAP goes back to `lever=later` — logged, not deleted) |
+| "X is done" (a CAP / priority item, not a board story) | **check the box** | `vt-priority.sh done <id…>` — `[x]` on today + week; a board story going Done shows `[x]` on its own via `vt-transition.sh` |
+| "what did we do yesterday?", "where was I?" | **orient (read)** | `vt-today.sh --yesterday` · `vt-week.sh --print` (the checkbox file) · `vt-today.sh --orient` (never gated) |
 | "drop X", "kill X", "X is dead", "X superseded by Y" | **retire** | `vt-transition.sh <id> abandoned` · `vt-transition.sh <id> superseded --by <id2>` |
 
 After running, re-render proof and keep it tight:
@@ -76,8 +80,8 @@ After running, re-render proof and keep it tight:
 **Capture defaults** (mirror how the operator actually talks):
 - **type** = `dev` unless the wording is exploratory ("spike", "figure out", "decide", "explore") → `modeling`.
 - **deadline** = set it when stated or implied ("by Friday", "before the demo") as `YYYY-MM-DD`; else none.
-- **priority** = only if the user states it ("high", "top", "today"). New work lands in **Backlog**;
-  don't auto-prioritize — capture and prioritize are separate acts, and priority stays the user's.
+- **priority** = only if the user states it ("high", "top", "today"). New work lands in the **detached store** (`.4loops/store/`, state `captured`→`active`);
+  don't auto-prioritize and don't draft onto the board — capture and prioritize are separate acts, and priority stays the user's.
 - **project** = the sole project by default; infer from context when several; ask only if truly ambiguous.
 
 **Batch it.** If the user rattles off several things at once ("metrics is done, start the pricing
@@ -93,10 +97,23 @@ the board already reflects everything, because every change rode a rail.
 
 ## Notes
 
-- This never lifts the daily/weekly **gate** — that's `/today` / `/week`'s job (the deliberate
-  reconciliation). `/sync` is the lightweight in-between; if focus is stale, nudge the user toward
-  `/today`, but don't block their flow.
-- For a deliberate, structured pass (see-the-board-then-pick checkboxes), that's `/today` / `/week`.
-  `/sync` is the talk-don't-click path. Same rails underneath.
-- The rails underneath (`vt-draft.sh`, `vt-transition.sh`, `vt-priority.sh`) are the same ones the
+- This never lifts the **gate** — that's `/week`'s job (the one-shot orientation: look-back → week from
+  the store → today's 2–3). `/sync` is the lightweight in-between; if priorities are stale, nudge the
+  user toward `/week`, but don't block their flow.
+- **Stale orientation does not block `/sync` either.** The orientation gate covers writes to the
+  **gated product surfaces** (the codebase) and nothing else; the board rails are guarded by the
+  separate per-session **capability** that `/4loops:sync` mints. So keep moving the board while
+  orientation is stale — just say that `/week` is still owed. Never report an orientation deny as
+  though it stopped a board move.
+- **Read-only rails are never gated:** `vt-render.sh`, `vt-drift.sh`, `vt-store-list.sh`,
+  `vt-week.sh --orient`, `vt-today.sh --orient`. Run them to answer a question at any time.
+- **One capability per session, last slash wins** (intentional — grants do not accumulate). If the
+  user types another `/4loops:*` command mid-session, this session's `sync` grant is replaced; ask
+  them to re-type `/4loops:sync` instead of working around the deny.
+- For the deliberate orientation pass, that's `/week` (and `/today` only for a mid-day re-pull from the
+  week). `/sync` is the talk-don't-click path in between. Same rails underneath.
+- The rails underneath (`vt-store-capture.sh` for new work, `vt-transition.sh`, `vt-priority.sh`; `vt-draft.sh` only for intentional board drafts) are the same ones the
   rituals use; talking here just drives them conversationally instead of via checkboxes.
+- The board is **active state only** — Planning → In Progress → Testing → Done. There is no Backlog
+  target: uncommitted work stays in the store, and dead work retires via `abandoned` / `superseded`.
+  Lifecycle beyond state moves (edit · merge · remove · Done flush · key rename) lives in `/manage`.
