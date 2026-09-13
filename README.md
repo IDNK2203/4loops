@@ -18,11 +18,13 @@ The loop has four acts — **capture · check · prioritize · review** — at t
 | `/4loops:week` | **The one-shot orientation** — print the checkbox priorities, a light look-back (last week on a new week; since yesterday otherwise), set the week from the store (≤5 open), pick today's 2–3 from it. Gate clears. Run it every morning. |
 | `/4loops:today` | **Mid-day pull from the week** — re-point today's 2–3 from the week's items. Not required for the gate; `/week` already includes the today beat. |
 | `/4loops:sync` | **In-between — just talk.** The intra-cadence loop: open it and speak; it captures, moves state, re-points priority, retires — on the real rails, opening on the priority-annotated board. |
+| `/4loops:backlog` | **Intake view** — what's captured but not started: store items with their levers, plus any legacy Backlog cells awaiting migration. |
 | `/4loops:board` | Render the raw kanban (keep it pinned — see below). |
-| `/4loops:help` | The command map + one line on each gate. The one command Claude may open for you unprompted — it's read-only. |
+| `/4loops:priorities` | **Focus view** — today's 2–3 and this week's ≤5 as checkboxes. Shows the file; doesn't re-orient or clear the gate. |
+| `/4loops:help` | The command map + one line on each gate. |
 | `/4loops:disable` | Opt this workspace out of enforcement. Deletes nothing; undone with `rm .4loops/disabled`. |
 
-Stories carry **type** (`dev` / `modeling`) and an optional **deadline** — the deadline powers prioritization + drift. The daily surface is the first five commands above; `/help` and `/disable` are there when you need them. Capture/check(move)/prioritize also exist as thin hidden escapes (`/4loops:capture`, `:manage`, `:prioritize`) for direct use, but the normal path is to just talk in `/sync`.
+Stories carry **type** (`dev` / `modeling`) and an optional **deadline** — the deadline powers prioritization + drift. The daily surface is the first four commands above; the three **views** (`/backlog` → `/board` → `/priorities`: intake, pipeline, focus) are read-only and always available, even mid-ritual or while a gate is denying something else. `/help` and `/disable` are there when you need them. Capture/check(move)/prioritize also exist as thin hidden escapes (`/4loops:capture`, `:manage`, `:prioritize`) for direct use, but the normal path is to just talk in `/sync`.
 
 **Not sure where to start?** `/4loops:week` in the morning, `/4loops:sync` the rest of the day. Everything else is a shortcut for something those two already do — and `/4loops:help` prints the map any time.
 
@@ -32,7 +34,7 @@ Stories carry **type** (`dev` / `modeling`) and an optional **deadline** — the
 
 4loops never moves your board on its own — and never *pretends* to:
 
-- **You hold the key.** Every board-touching command is **user-invoked only** — Claude can't start a reconciliation, capture, or move on its own. The command you type is your consent; nothing happens ambiently. (`/board` and `/help` are the exceptions, and only because they're read-only.)
+- **You hold the key.** Every board-touching command is **user-invoked only** — Claude can't start a reconciliation, capture, or move on its own. The command you type is your consent; nothing happens ambiently. (The views — `/backlog`, `/board`, `/priorities` — and `/help` are the exceptions, and only because they read and never write.)
 - **Operate, never simulate.** Inside `/sync`, every change runs a real rail and **re-renders the board from disk as proof** — and the gate physically blocks hand-editing the board files, so a move can't be faked. If the board didn't change, it didn't happen.
 - **Config first.** Every command requires `/4loops:configure` to have run — a fresh install does nothing until you set it up.
 - **Today ⊆ week.** Today holds 2–3 items and only from the week (≤5 open, picked from the store); a today add is promoted onto the week. `/4loops:week` is the one-shot orientation every morning; `/4loops:today` is only a mid-day re-pull and refuses on a stale week.

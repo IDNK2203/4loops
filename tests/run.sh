@@ -1071,8 +1071,9 @@ ck "today skill: same rule, no question-skip past the print"         'grep -q "T
 ck "sync skill: orient prints are unconditional too"                 'grep -q "prints above are unconditional" "$SK/sync/SKILL.md" && ! grep -q "skip straight to step 2 and act on it" "$SK/sync/SKILL.md"'
 # ── invocation-matrix invariants: the SoT table must stay true of the code
 # Packet 010: `help` joins `board` as model-invokable (read-only discoverability).
+# Packet 012: `backlog` + `priorities` join them — the three Views are read-only.
 # Every OTHER skill must keep disable-model-invocation — that is Gate A.
-ck "matrix: board + help are the ONLY model-invokable skills"        '[ "$(grep -L "disable-model-invocation: true" "$SK"/*/SKILL.md | sort | tr "\n" " ")" = "$SK/board/SKILL.md $SK/help/SKILL.md " ]'
+ck "matrix: the views + help are the ONLY model-invokable skills"    '[ "$(grep -L "disable-model-invocation: true" "$SK"/*/SKILL.md | sort | tr "\n" " ")" = "$SK/backlog/SKILL.md $SK/board/SKILL.md $SK/help/SKILL.md $SK/priorities/SKILL.md " ]'
 ck "matrix: every skill is user-invocable"                           '[ "$(grep -l "^user-invocable: true$" "$SK"/*/SKILL.md | wc -l | tr -d " ")" = "$(ls -d "$SK"/*/ | wc -l | tr -d " ")" ]'
 # No rail may fall through vt_rail_tier: an unclassified vt-*.sh is a fail-open
 # hole in the bash gate (empty tier → allowed with no capability).
@@ -1156,7 +1157,10 @@ ck "globs: caller's noglob flag is left as it was" 'bash -c "source \"$S/vt-guar
 rm -rf "$W32"
 # ── /scope is gone (Track B dead — Ese lock 2026-09-13)
 ck "scope: the skill directory is removed"                   '[ ! -d "$SK/scope" ]'
-ck "scope: ten skills ship (eight + help + disable)"         '[ "$(ls -d "$SK"/*/ | wc -l | tr -d " ")" = "10" ]'
+# (The shipped-skill count lived here and pinned 10; it went stale the moment a
+# packet added a skill. There is now ONE count assertion, in the Packet 012
+# section — one place to bump. `the skill directory is removed` above already
+# proves /scope itself is gone, which is what this section is actually about.)
 ck "scope: no skill still points the user at /scope"         '! grep -rn "4loops:scope\|\`/scope\`" "$SK" >/dev/null 2>&1'
 ck "scope: no capability named scope unlocks anything"       'bash -c "source \"$S/vt-guard-lib.sh\"; ! vt_cap_allows scope mutate && ! vt_cap_allows scope gateclear-week && ! vt_cap_allows scope gateclear-today"'
 ck "scope: the rails survive and keep their tiers"           'bash -c "source \"$S/vt-guard-lib.sh\"; [ \"\$(vt_rail_tier vt-scope-promote)\" = mutate ] && [ \"\$(vt_rail_tier vt-scope-list)\" = readonly ]"'
@@ -1298,6 +1302,63 @@ ck "readme: the dead /4loops:nav survives only in the rename note" \
 ck "readme: no bare /nav shorthand is left over"                 '! grep -qE "\`/nav\`|/nav\b" "$RM"'
 ck "readme: the opt-out is documented under How it enforces"     'grep -q "Opt-outable, per workspace" "$RM" && grep -q "rm .4loops/disabled" "$RM"' 
 unset VT_DIR; rm -rf "$W33"
+
+# ══ v2.5 Packet 012 — Views: /priorities + /backlog ═════════════════════════
+# Two read-only views join /board: intake (backlog) → pipeline (board) → focus
+# (priorities). Same bar as /board: model-invokable, mutate nothing, clear no
+# gate. The risk this section guards is a "view" that quietly writes — either by
+# running a ritual to freshen what it prints, or by migrating what it lists.
+ck "views: priorities skill ships"                      '[ -f "$SK/priorities/SKILL.md" ]'
+ck "views: backlog skill ships"                         '[ -f "$SK/backlog/SKILL.md" ]'
+ck "views: skill count is 12"                           '[ "$(ls -d "$SK"/*/ | wc -l | tr -d " ")" = "12" ]'
+ck "views: both are model-invokable (no Gate A opt-out)" '! grep -q "disable-model-invocation" "$SK/priorities/SKILL.md" && ! grep -q "disable-model-invocation" "$SK/backlog/SKILL.md"'
+ck "views: both are user-invocable"                     'grep -q "^user-invocable: true$" "$SK/priorities/SKILL.md" && grep -q "^user-invocable: true$" "$SK/backlog/SKILL.md"'
+ck "views: both declare allowed-tools: Bash"            'grep -q "^allowed-tools: Bash$" "$SK/priorities/SKILL.md" && grep -q "^allowed-tools: Bash$" "$SK/backlog/SKILL.md"'
+ck "views: both carry the never-blocked contract"       'grep -q "^## Never blocked" "$SK/priorities/SKILL.md" && grep -q "^## Never blocked" "$SK/backlog/SKILL.md"'
+
+# The print rail. A new vt-*.sh with no tier is a bash-gate fail-open (covered
+# generically above); pin this one explicitly since it is the packet's only rail.
+ck "views: vt-priorities-print ships and is executable" '[ -x "$S/vt-priorities-print.sh" ]'
+ck "rail-tier: vt-priorities-print is readonly"         '[ "$(bash -c "source \"$S/vt-guard-lib.sh\"; vt_rail_tier vt-priorities-print")" = "readonly" ]'
+ck "rail-tier: vt-priorities-print needs no capability" 'bash -c "source \"$S/vt-guard-lib.sh\"; vt_cap_allows \"\" \"\$(vt_rail_tier vt-priorities-print)\""'
+
+# A view must not re-orient to freshen what it shows: that would clear the gate
+# the user never asked to clear, and hide staleness instead of reporting it.
+ck "views: /priorities drives the print rail"           'grep -q "scripts/vt-priorities-print.sh" "$SK/priorities/SKILL.md"'
+ck "views: /priorities never runs a gate-clearing rail" '! grep -qE "vt-(week|today|priority)\.sh" "$SK/priorities/SKILL.md"'
+ck "views: /priorities says reading never clears the gate" 'grep -qi "never clears the gate" "$SK/priorities/SKILL.md"'
+ck "views: /priorities reports staleness, not a silent re-orient" 'grep -q "Stale — run /4loops:week" "$SK/priorities/SKILL.md"'
+
+# /backlog composes two EXISTING read-only rails and must never migrate.
+ck "views: /backlog lists the store"                    'grep -q "scripts/vt-store-list.sh" "$SK/backlog/SKILL.md"'
+ck "views: /backlog renders the legacy column"          'grep -q "scripts/vt-render.sh\" backlog" "$SK/backlog/SKILL.md"'
+ck "views: /backlog never runs the migration rail"      '! grep -qE "^[^#]*\\\$\{CLAUDE_PLUGIN_ROOT\}/scripts/vt-migrate-backlog\.sh" "$SK/backlog/SKILL.md"'
+ck "views: /backlog explains migration is NOT its job"  'grep -q "^## Migration is not this command" "$SK/backlog/SKILL.md"'
+ck "views: /backlog has empty-intake copy"              'grep -qi "Intake is empty" "$SK/backlog/SKILL.md"'
+
+# Discoverability: the map is the front door for the read-only set.
+ck "help: lists a Views group"                          'grep -q "^\*\*Views\*\*" "$SK/help/SKILL.md"'
+ck "help: names all three views"                        'grep -q "4loops:backlog\`" "$SK/help/SKILL.md" && grep -q "4loops:board\`" "$SK/help/SKILL.md" && grep -q "4loops:priorities\`" "$SK/help/SKILL.md"'
+ck "help: read-only rail list includes the print rail"  'grep -q "vt-priorities-print.sh" "$SK/help/SKILL.md"'
+
+# Functional: the rail really prints the file, and really mutates nothing.
+W34=$(mktemp -d); export VT_DIR="$W34/.4loops"
+bash "$S/vt-init.sh" >/dev/null; bash "$S/vt-config.sh" project P0 "dev-os" dev-os >/dev/null
+bash "$S/vt-draft.sh" P0 "ship the views packet" dev >/dev/null 2>&1
+bash "$S/vt-week.sh" set P0-001 --today P0-001 >/dev/null 2>&1
+PRI_BEFORE=$(cd "$VT_DIR" && find . -type f -exec shasum {} \; | sort)
+PRINT_OUT=$(bash "$S/vt-priorities-print.sh" 2>&1); PRINT_RC=$?
+PRI_AFTER=$(cd "$VT_DIR" && find . -type f -exec shasum {} \; | sort)
+ck "rail: vt-priorities-print exits clean"              '[ "'"$PRINT_RC"'" = "0" ]'
+ck "rail: vt-priorities-print emits the focus content"  'printf "%s" "$PRINT_OUT" | grep -q "ship the views packet"'
+ck "rail: vt-priorities-print mutates NOTHING"          '[ "$PRI_BEFORE" = "$PRI_AFTER" ]'
+ck "rail: the store view runs with no capability"       'bash "$S/vt-store-list.sh" live >/dev/null 2>&1'
+ck "rail: the legacy backlog view runs with no capability" 'bash "$S/vt-render.sh" backlog >/dev/null 2>&1'
+# Missing file is a message, not a crash — /priorities documents this path.
+rm -f "$VT_DIR/current-priorities.md"
+MISS_OUT=$(bash "$S/vt-priorities-print.sh" 2>&1); MISS_RC=$?
+ck "rail: no priorities file → hint, exit 0"            '[ "'"$MISS_RC"'" = "0" ] && printf "%s" "$MISS_OUT" | grep -q "no current-priorities.md yet"'
+unset VT_DIR; rm -rf "$W34"
 
 echo "════ RESULT: $P passed, $F failed ════"
 [ "$F" -eq 0 ]
