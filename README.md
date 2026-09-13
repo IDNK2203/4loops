@@ -10,26 +10,30 @@ It operates on whatever workspace it is enabled in. All state is plain files und
 
 The loop has four acts — **capture · check · prioritize · review** — at two cadences (daily, weekly). You never have to *think* about those acts: you run two rituals on a rhythm, and for everything in between, **you open one command and talk.**
 
-**Between rituals, just talk.** Open `/4loops:nav` once and then say what's happening — *"the metrics endpoint is done, start the pricing copy, add rate limiting due Friday."* It opens on a **priority-annotated board** (★ today's focus · ! overdue · ⏳ due-soon · ◆ modeling — where you stand vs your day/week), then turns each thing you say into a real board move and runs it on the rails. New tasks, state moves, priority, retirements — all by talking, no commands to memorize.
+**Between rituals, just talk.** Open `/4loops:sync` once and then say what's happening — *"the metrics endpoint is done, start the pricing copy, add rate limiting due Friday."* It opens on a **priority-annotated board** (★ today's focus · ! overdue · ⏳ due-soon · ◆ modeling — where you stand vs your day/week), then turns each thing you say into a real board move and runs it on the rails. New tasks, state moves, priority, retirements — all by talking, no commands to memorize.
 
 | Command | What it does |
 | --- | --- |
 | `/4loops:configure` | **First-run setup** (run once): detect your projects, pick a week-start, confirm gated surfaces, spawn this week's focus — and pin your board. |
 | `/4loops:week` | **The one-shot orientation** — print the checkbox priorities, a light look-back (last week on a new week; since yesterday otherwise), set the week from the store (≤5 open), pick today's 2–3 from it. Gate clears. Run it every morning. |
 | `/4loops:today` | **Mid-day pull from the week** — re-point today's 2–3 from the week's items. Not required for the gate; `/week` already includes the today beat. |
-| `/4loops:nav` | **In-between — just talk.** The intra-cadence loop: open it and speak; it captures, moves state, re-points priority, retires — on the real rails, opening on the priority-annotated board. |
+| `/4loops:sync` | **In-between — just talk.** The intra-cadence loop: open it and speak; it captures, moves state, re-points priority, retires — on the real rails, opening on the priority-annotated board. |
 | `/4loops:board` | Render the raw kanban (keep it pinned — see below). |
+| `/4loops:help` | The command map + one line on each gate. The one command Claude may open for you unprompted — it's read-only. |
+| `/4loops:disable` | Opt this workspace out of enforcement. Deletes nothing; undone with `rm .4loops/disabled`. |
 
-Stories carry **type** (`dev` / `modeling`) and an optional **deadline** — the deadline powers prioritization + drift. The whole surface is the five commands above. Capture/check(move)/prioritize also exist as thin hidden escapes (`/4loops:capture`, `:manage`, `:prioritize`) for direct use, but the normal path is to just talk in `/nav`.
+Stories carry **type** (`dev` / `modeling`) and an optional **deadline** — the deadline powers prioritization + drift. The daily surface is the first five commands above; `/help` and `/disable` are there when you need them. Capture/check(move)/prioritize also exist as thin hidden escapes (`/4loops:capture`, `:manage`, `:prioritize`) for direct use, but the normal path is to just talk in `/sync`.
 
-> **Pin your board.** The rituals + `/nav` assume the board is glanceable. Open `.4loops/board.md`, pin the tab, and toggle Markdown preview (VS Code: right-click tab → Pin · ⌘K V). `/4loops:configure` reminds you on first run.
+**Not sure where to start?** `/4loops:week` in the morning, `/4loops:sync` the rest of the day. Everything else is a shortcut for something those two already do — and `/4loops:help` prints the map any time.
+
+> **Pin your board.** The rituals + `/sync` assume the board is glanceable. Open `.4loops/board.md`, pin the tab, and toggle Markdown preview (VS Code: right-click tab → Pin · ⌘K V). `/4loops:configure` reminds you on first run.
 
 ## The rules (how the board stays honest)
 
 4loops never moves your board on its own — and never *pretends* to:
 
-- **You hold the key.** Every board-touching command is **user-invoked only** — Claude can't start a reconciliation, capture, or move on its own. The command you type is your consent; nothing happens ambiently.
-- **Operate, never simulate.** Inside `/nav`, every change runs a real rail and **re-renders the board from disk as proof** — and the gate physically blocks hand-editing the board files, so a move can't be faked. If the board didn't change, it didn't happen.
+- **You hold the key.** Every board-touching command is **user-invoked only** — Claude can't start a reconciliation, capture, or move on its own. The command you type is your consent; nothing happens ambiently. (`/board` and `/help` are the exceptions, and only because they're read-only.)
+- **Operate, never simulate.** Inside `/sync`, every change runs a real rail and **re-renders the board from disk as proof** — and the gate physically blocks hand-editing the board files, so a move can't be faked. If the board didn't change, it didn't happen.
 - **Config first.** Every command requires `/4loops:configure` to have run — a fresh install does nothing until you set it up.
 - **Today ⊆ week.** Today holds 2–3 items and only from the week (≤5 open, picked from the store); a today add is promoted onto the week. `/4loops:week` is the one-shot orientation every morning; `/4loops:today` is only a mid-day re-pull and refuses on a stale week.
 - **The board can't be hand-edited.** `board.md` / `current-priorities.md` are rail-owned; direct edits are blocked. Like the gate, the override (`VT_ALLOW_RECORD_WRITE=1`) is env-only — the agent can't set it; it edits only through the rails.
@@ -39,6 +43,7 @@ Stories carry **type** (`dev` / `modeling`) and an optional **deadline** — the
 - **SessionStart sentinel** — renders the board dashboard, surfaces drift, and auto-runs the weekly rollover (Done → `archive/<month>/closed.md`).
 - **PreToolUse hard gate** — focus-staleness blocks writes to gated product surfaces until the daily/weekly reconciliation runs. Per-session clearance carries across midnight. The gate is **un-bypassable by the agent**: the override is read only from the session's environment (launch with `VT_ALLOW_STALE_GATE=1`), which the agent can't set — its only path when blocked is to stop and have you reconcile. Every override is logged to `override.log`.
 - **Bash writes too** — a path-only Edit/Write gate is bypassable by shelling out, so the gate also re-derives write targets from Bash commands (`>`, `>>`, `tee`, `sed -i`, `rm`, `mv`, `cp`, `touch`, `ln`, `mkdir`) — honoring a leading `cd <dir> &&` so relative targets resolve right — and applies the identical check. Residual blind spots (fail-open): glob/quoted args, mid-command `cd` chains, and arbitrary-code writers (`python -c`, `node -e`). Recommended: set `CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR=1` so relative paths resolve against the workspace root.
+- **Opt-outable, per workspace** — `/4loops:disable` writes `.4loops/disabled` and every hook steps aside: gate, capability check, record protection, prompt nudge. Nothing is deleted, so `rm .4loops/disabled` resumes the same board. It's **user-invoked only** and the flag is rail-owned, so the agent can neither run it nor write the file — a gate the agent could switch off isn't a gate.
 - **Project-scoped by default** — each tracked project is gated as a *whole* (everything inside it, source included); Areas — notes, research, docs — always flow. `/4loops:configure` proposes the gated set (your projects) and lets you trim or add (see [Configuration](#configuration)).
 
 ## Configuration
@@ -64,12 +69,12 @@ The **hard-exempt** surfaces are always writable regardless of config — `.4loo
 
 The intra-cadence loop — **between the rituals, you just talk:**
 
-- **`/4loops:nav` — talk, don't click.** Open it once and speak ("metrics endpoint is done, start the pricing copy, add rate limiting due Friday"); it maps each thing to a real board move and runs it. The high-traffic acts (capture, move state, prioritize, retire) collapse into one conversation — no commands to memorize.
-- **Priority-annotated board.** `/nav` (and `vt-render --priorities`) overlays your standing relative to your day/week onto the kanban: **★ today's focus · ! overdue · ⏳ due-soon · ◆ modeling.** "Where am I," not just "what's on the board."
-- **Operate, never simulate.** Every `/nav` change runs a rail and re-renders from disk as proof; the gate blocks hand-edits, so a move can't be faked. It also refuses to invent IDs — if it can't match what you said to a real story, it asks.
+- **`/4loops:sync` — talk, don't click.** (It shipped as `/4loops:nav` and was renamed in v2.4.) Open it once and speak ("metrics endpoint is done, start the pricing copy, add rate limiting due Friday"); it maps each thing to a real board move and runs it. The high-traffic acts (capture, move state, prioritize, retire) collapse into one conversation — no commands to memorize.
+- **Priority-annotated board.** `/sync` (and `vt-render --priorities`) overlays your standing relative to your day/week onto the kanban: **★ today's focus · ! overdue · ⏳ due-soon · ◆ modeling.** "Where am I," not just "what's on the board."
+- **Operate, never simulate.** Every `/sync` change runs a rail and re-renders from disk as proof; the gate blocks hand-edits, so a move can't be faked. It also refuses to invent IDs — if it can't match what you said to a real story, it asks.
 - **Week-before-day, enforced.** On a fresh ISO week `/today` is *refused* until `/week` runs — the weekly anchors flow into the day (was only a nudge).
 - **User-invoked only.** Every board-touching command is `disable-model-invocation` — Claude can't move your board on its own. The typed command is your consent.
-- **Hidden escapes.** `/4loops:capture`, `:manage`, `:prioritize` remain for direct use, but `/nav` does all three by talking.
+- **Hidden escapes.** `/4loops:capture`, `:manage`, `:prioritize` remain for direct use, but `/sync` does all three by talking.
 
 Carried forward from **v2.1**: see-then-pick rituals · story types (`dev` / `modeling`, ◆) · deadlines + deadline-aware drift · context-as-link · honest endings (abandon / supersede / backdate) · rail-owned records · self-cleaning markers. All additive — v2.0/v2.1 boards keep working untouched.
 
@@ -80,7 +85,7 @@ Carried forward from **v2.1**: see-then-pick rituals · story types (`dev` / `mo
 /plugin install 4loops
 ```
 
-Then run **`/4loops:configure`** once. It detects your projects, asks for a week-start, confirms the gated surfaces, and spawns this week's focus onto the board — so your first session ends on a board full of *your* work, not an empty template. After that: `/4loops:week` each morning (one shot), and **`/4loops:nav` to just talk** in between.
+Then run **`/4loops:configure`** once. It detects your projects, asks for a week-start, confirms the gated surfaces, and spawns this week's focus onto the board — so your first session ends on a board full of *your* work, not an empty template. After that: `/4loops:week` each morning (one shot), and **`/4loops:sync` to just talk** in between. `/4loops:help` prints the map whenever you lose the thread.
 
 The plugin stays quiet in any workspace without a `.4loops/` directory — install it globally and it only wakes up where you've configured it.
 

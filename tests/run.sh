@@ -1273,17 +1273,30 @@ ck "help skill: is model-invokable (no Gate A flag)"    '! grep -q "disable-mode
 ck "help skill: is user-invocable too"                  'grep -q "^user-invocable: true$" "$SK/help/SKILL.md"'
 ck "help skill: prints the command map, /week first"    'grep -q "4loops:week" "$SK/help/SKILL.md" && grep -q "Type this every morning" "$SK/help/SKILL.md"'
 ck "help skill: carries the two-gates lines"            'grep -q "^## The two gates" "$SK/help/SKILL.md" && grep -q "codebase) only" "$SK/help/SKILL.md" && grep -qi "Rail-capability bash-gate" "$SK/help/SKILL.md"'
-ck "help skill: names every shipped command"            'for c in week today prioritize sync board capture manage configure help disable; do grep -q "4loops:$c\`" "$SK/help/SKILL.md" || exit 1; done'
+ck "help skill: names every shipped command"            '( for c in week today prioritize sync board capture manage configure help disable; do grep -q "4loops:$c\`" "$SK/help/SKILL.md" || exit 1; done )'
 ck "help skill: says it is read-only / mutates nothing" 'grep -q "^\*\*Read-only\.\*\*" "$SK/help/SKILL.md"'
 ck "help skill: states the read-only carve-out"         'grep -qi "read-only rail" "$SK/help/SKILL.md"'
 ck "disable skill: ships"                               '[ -f "$SK/disable/SKILL.md" ]'
 ck "disable skill: is user-invoked ONLY (Gate A)"       'grep -q "^disable-model-invocation: true$" "$SK/disable/SKILL.md" && grep -q "^user-invocable: true$" "$SK/disable/SKILL.md"'
 ck "disable skill: explains how to re-enable"           'grep -q "rm .4loops/disabled" "$SK/disable/SKILL.md" && grep -q "disable off" "$SK/disable/SKILL.md"'
 ck "disable skill: promises no data is wiped"           'grep -q "^## What stays" "$SK/disable/SKILL.md" && grep -q "\*\*Nothing is deleted\.\*\*" "$SK/disable/SKILL.md"'
-ck "disable skill: names all four checks it switches off" 'for k in "Orientation gate" "Rail capability" "Rail-record protection" "Prompt nudge"; do grep -q "$k" "$SK/disable/SKILL.md" || exit 1; done'
+ck "disable skill: names all four checks it switches off" '( for k in "Orientation gate" "Rail capability" "Rail-record protection" "Prompt nudge"; do grep -q "$k" "$SK/disable/SKILL.md" || exit 1; done )'
 ck "disable skill: drives the rail, not a hand-written flag" 'grep -q "scripts/vt-disable.sh" "$SK/disable/SKILL.md" && ! grep -q "touch .4loops/disabled" "$SK/disable/SKILL.md"'
 ck "disable skill: says the agent can never fire it"    'grep -q "agent can never fire this on its own" "$SK/disable/SKILL.md"'
 ck "surround: neither new skill points at the dead /scope" '! grep -n "4loops:scope" "$SK/help/SKILL.md" "$SK/disable/SKILL.md" >/dev/null 2>&1'
+
+# ── README rot guard. /nav was renamed to /sync in v2.4 and the README still
+# advertised the dead command a packet later, which is how a front door goes
+# stale unnoticed. Hold it to the shipped skill set.
+RM="$(cd "$PLUGIN/.." && pwd)/README.md"
+ck "readme: every command in the table is a skill that ships" \
+   '( for c in $(grep -oE "^\| \`/4loops:[a-z]+\`" "$RM" | sed "s/.*4loops://; s/\`//"); do [ -d "$SK/$c" ] || exit 1; done )'
+ck "readme: every skill that ships is named somewhere in it" \
+   '( for d in "$SK"/*/; do c=$(basename "$d"); grep -q "4loops:$c\`" "$RM" || grep -q "\`:$c\`" "$RM" || exit 1; done )'
+ck "readme: the dead /4loops:nav survives only in the rename note" \
+   '[ "$(grep -c "4loops:nav" "$RM")" = "1" ] && grep -q "renamed in v2.4" "$RM"'
+ck "readme: no bare /nav shorthand is left over"                 '! grep -qE "\`/nav\`|/nav\b" "$RM"'
+ck "readme: the opt-out is documented under How it enforces"     'grep -q "Opt-outable, per workspace" "$RM" && grep -q "rm .4loops/disabled" "$RM"' 
 unset VT_DIR; rm -rf "$W33"
 
 echo "════ RESULT: $P passed, $F failed ════"
