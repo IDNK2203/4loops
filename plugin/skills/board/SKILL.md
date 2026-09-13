@@ -48,6 +48,12 @@ Build the arg list for the script. Order doesn't matter — the script accepts s
 
 Print the script's stdout **verbatim** as the response — it is a markdown artifact; let it render directly. Do NOT add commentary, summaries, or annotations, and **do NOT reflow the kanban table into a list**: the full-board cells are already compact (ID + title) so the table fits, and `/board --list` is the only list form. The board IS the message.
 
+## Never blocked
+
+`vt-render.sh` is a **read-only rail**: it needs no session capability and the orientation gate
+does not apply to it. Render the board whenever asked — before the morning `/week`, mid-ritual,
+or while some other write is denied. A deny you hit elsewhere is never a reason to refuse this.
+
 ## Errors
 
 If the board doesn't exist yet, the script prints a hint to run `/draft` first. Pass that message through unchanged.

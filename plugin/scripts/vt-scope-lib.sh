@@ -5,6 +5,13 @@
 # Capacity judgment only: deadline · impact · resource. No modeling.
 # Source this file; do not invoke it directly.
 #
+# UNSURFACED (v2.5 Packet 009b): Track B is dead and the `/scope` skill was
+# removed, so nothing in the product routes here. The rail still works and
+# still carries its bash-gate tier; it is a bare power-user hatch, reachable
+# only from a session that already holds a capability from another
+# /4loops:* command. Scope docs under .4loops/tasks/ still never expire —
+# delete them by hand.
+#
 # Promote reads an *active* store item and writes a scope doc. Does NOT
 # touch board.md. Store item stays active; scoped_at + scope_doc are set.
 

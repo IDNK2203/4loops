@@ -66,3 +66,5 @@ Options = the week's open items, `TODAY_SUGGESTED` first, labelled `ID — title
 - Add one item without re-picking: `/4loops:prioritize add "<item>"`. Check a box: `/4loops:prioritize done <ID>`.
 - "What did we do yesterday?" → `vt-today.sh --yesterday` (last Today's checkboxes + that day's board and store transitions). History lives in `priorities.log` + the two `transitions.log`s.
 - Priority stays **yours** — propose, you decide. Never hand-edit `board.md` / `current-priorities.md`.
+- **Read-only rails are never gated.** `vt-today.sh --orient` / `--print` / `--current` / `--yesterday`, `vt-week.sh --orient`, `vt-render.sh`, `vt-drift.sh`, `vt-store-list.sh` need no capability and no fresh orientation. Run them freely to answer a question — do not claim you are blocked from looking.
+- **A stale gate blocks the codebase, not the board.** Stale orientation stops writes to the gated product surfaces only; board moves ride a separate per-session capability.

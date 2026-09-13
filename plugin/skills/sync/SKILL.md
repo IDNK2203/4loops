@@ -100,6 +100,16 @@ the board already reflects everything, because every change rode a rail.
 - This never lifts the **gate** — that's `/week`'s job (the one-shot orientation: look-back → week from
   the store → today's 2–3). `/sync` is the lightweight in-between; if priorities are stale, nudge the
   user toward `/week`, but don't block their flow.
+- **Stale orientation does not block `/sync` either.** The orientation gate covers writes to the
+  **gated product surfaces** (the codebase) and nothing else; the board rails are guarded by the
+  separate per-session **capability** that `/4loops:sync` mints. So keep moving the board while
+  orientation is stale — just say that `/week` is still owed. Never report an orientation deny as
+  though it stopped a board move.
+- **Read-only rails are never gated:** `vt-render.sh`, `vt-drift.sh`, `vt-store-list.sh`,
+  `vt-week.sh --orient`, `vt-today.sh --orient`. Run them to answer a question at any time.
+- **One capability per session, last slash wins** (intentional — grants do not accumulate). If the
+  user types another `/4loops:*` command mid-session, this session's `sync` grant is replaced; ask
+  them to re-type `/4loops:sync` instead of working around the deny.
 - For the deliberate orientation pass, that's `/week` (and `/today` only for a mid-day re-pull from the
   week). `/sync` is the talk-don't-click path in between. Same rails underneath.
 - The rails underneath (`vt-store-capture.sh` for new work, `vt-transition.sh`, `vt-priority.sh`; `vt-draft.sh` only for intentional board drafts) are the same ones the

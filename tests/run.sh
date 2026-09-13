@@ -614,7 +614,10 @@ ck "rail-record: store path protected"            'vt_is_rail_record "$VT_DIR/st
 unset VT_DIR
 
 
-echo "════ 24. v2.5 Track B: scope promote (capacity only, no board) ════"
+# Track B is DEAD as a product surface and the /scope skill is gone (Packet 009b).
+# The rails below stay — they still work, still carry a tier, and are reachable from
+# a session holding any other capability — so they stay covered here.
+echo "════ 24. v2.5 Track B (rails only — /scope skill removed): scope promote ════"
 W24=$(mktemp -d); export VT_DIR="$W24/.4loops"
 bash "$S/vt-init.sh" >/dev/null
 printf 'P0\tScope happy path\tdev\tpacket-003\t2026-09-20\n' | bash "$S/vt-store-capture.sh" >/tmp/vt-scope-cap-out.txt
@@ -660,8 +663,10 @@ ck "rail-tier: vt-scope-promote is mutate"        '[ "$(vt_rail_tier vt-scope-pr
 ck "rail-tier: vt-scope-list is readonly"         '[ "$(vt_rail_tier vt-scope-list)" = "readonly" ]'
 ck "rail-tier: vt-scope-read is readonly"         '[ "$(vt_rail_tier vt-scope-read)" = "readonly" ]'
 ck "rail-record: tasks path protected"            'vt_is_rail_record "$VT_DIR/tasks/P0/x.md"'
-# cap allows scope
-ck "cap-allows: scope covers mutate"              'vt_cap_allows scope mutate'
+# `scope` is no longer a capability: the skill that minted it was removed, so the
+# string can never appear in a cap token. The rails ride another command's grant.
+ck "cap-allows: scope is no longer a capability"  '! vt_cap_allows scope mutate'
+ck "cap-allows: another grant still drives the scope rails" 'vt_cap_allows sync mutate && vt_cap_allows manage mutate'
 unset VT_DIR
 
 
@@ -1108,9 +1113,62 @@ ck "deny copy: rail-capability block says read-only is never blocked" 'vt_cap_de
 ck "deny copy: rail-record block names the bash-gate"                'vt_record_deny_reason | grep -q "BASH-GATE (rail-owned record"'
 ck "deny copy: orientation gate says it is NOT the bash-gate"        'vt_gate_directive | grep -q "ORIENTATION GATE" && vt_gate_directive | grep -q "NOT the rail-capability bash-gate"'
 # ── audit: no skill still claims a Track B/D behaviour that never shipped
-ck "audit: /scope is marked paused, not live product"                'grep -q "Track B is PAUSED" "$SK/scope/SKILL.md"'
-ck "audit: /scope no longer claims Track D expires the scope doc"    '! grep -q "Track D removes it on Done" "$SK/scope/SKILL.md" && grep -q "Nothing removes it automatically" "$SK/scope/SKILL.md"'
 ck "audit: /manage no longer points at a /today reconcile that is gone" '! grep -q "like \`/today\`'"'"'s reconcile" "$SK/manage/SKILL.md"'
+
+echo "════ 32. v2.5 Packet 009b: gated globs are patterns · /scope removed · gate-scope docs ════"
+SK="$PLUGIN/skills"
+# ── The dogfood bug: `gated: web-app/*` was expanded as a PATHNAME, not kept as a
+# pattern. When the guard's cwd happened to contain web-app/, the config glob became
+# the LISTING (web-app/README.md, web-app/src, …), so a nested product file matched
+# nothing and the orientation gate silently stopped gating it. The §6 tests missed it
+# because their cwd (the repo) has no such directory — so this one runs FROM INSIDE
+# the workspace, where the expansion actually fires.
+W32=$(mktemp -d)
+mkdir -p "$W32/.4loops" "$W32/web-app/src/components" "$W32/notes"
+printf '# readme\n' > "$W32/web-app/README.md"          # makes web-app/* expandable
+printf 'gated: web-app/*\n' > "$W32/.4loops/config"
+G32=$( cd "$W32" && VT_DIR="$W32/.4loops" bash -c '
+  source "'"$S"'/vt-guard-lib.sh"
+  echo "GLOBS:$(vt_gated_globs | tr "\n" ",")"
+  vt_is_gated "'"$W32"'/web-app/src/components/Dashboard.jsx" "'"$W32"'" && echo NESTED:yes || echo NESTED:no
+  vt_is_gated "'"$W32"'/web-app/README.md" "'"$W32"'"              && echo TOP:yes    || echo TOP:no
+  vt_is_gated "'"$W32"'/notes/draft.txt" "'"$W32"'"                && echo OUT:yes    || echo OUT:no
+' )
+ck "globs: a config glob stays a pattern (no pathname expansion)" '[ "$(printf "%s" "$G32" | grep "^GLOBS:")" = "GLOBS:web-app/*," ]' "$G32"
+ck "globs: nested product file IS gated (the dogfood miss)"       'printf "%s" "$G32" | grep -q "^NESTED:yes$"' "$G32"
+ck "globs: top-level product file is still gated"                 'printf "%s" "$G32" | grep -q "^TOP:yes$"' "$G32"
+ck "globs: a file outside the gated glob is NOT gated"            'printf "%s" "$G32" | grep -q "^OUT:no$"' "$G32"
+# several globs on one config line must still split into several patterns
+printf 'gated: web-app/* notes/*\n' > "$W32/.4loops/config"
+G32B=$( cd "$W32" && VT_DIR="$W32/.4loops" bash -c 'source "'"$S"'/vt-guard-lib.sh"; vt_gated_globs | tr "\n" ","' )
+ck "globs: two globs on one line still split (word-splitting kept)" '[ "'"$G32B"'" = "web-app/*,notes/*," ]' "$G32B"
+# and the end-to-end guard agrees, through the real PreToolUse hook
+printf 'gated: web-app/*\n' > "$W32/.4loops/config"
+: > "$W32/.4loops/.armed"
+GJ=$(printf '{"session_id":"S32","cwd":"%s","tool_input":{"file_path":"%s"}}' \
+      "$W32" "$W32/web-app/src/components/Dashboard.jsx")
+GOUT=$( cd "$W32" && printf '%s' "$GJ" | bash "$H/vt-gate.sh" 2>&1 )
+ck "gate: stale + nested gated product file is DENIED end to end" 'printf "%s" "$GOUT" | grep -q "\"permissionDecision\"[[:space:]]*:[[:space:]]*\"deny\""' "$GOUT"
+# the caller's noglob setting is restored either way
+ck "globs: caller's noglob flag is left as it was" 'bash -c "source \"$S/vt-guard-lib.sh\"; export VT_DIR=\"$W32/.4loops\"; vt_gated_globs >/dev/null; case \$- in *f*) exit 1 ;; esac; set -f; vt_gated_globs >/dev/null; case \$- in *f*) exit 0 ;; esac; exit 1"'
+rm -rf "$W32"
+# ── /scope is gone (Track B dead — Ese lock 2026-09-13)
+ck "scope: the skill directory is removed"                   '[ ! -d "$SK/scope" ]'
+ck "scope: eight skills ship (was nine)"                     '[ "$(ls -d "$SK"/*/ | wc -l | tr -d " ")" = "8" ]'
+ck "scope: no skill still points the user at /scope"         '! grep -rn "4loops:scope\|\`/scope\`" "$SK" >/dev/null 2>&1'
+ck "scope: no capability named scope unlocks anything"       'bash -c "source \"$S/vt-guard-lib.sh\"; ! vt_cap_allows scope mutate && ! vt_cap_allows scope gateclear-week && ! vt_cap_allows scope gateclear-today"'
+ck "scope: the rails survive and keep their tiers"           'bash -c "source \"$S/vt-guard-lib.sh\"; [ \"\$(vt_rail_tier vt-scope-promote)\" = mutate ] && [ \"\$(vt_rail_tier vt-scope-list)\" = readonly ]"'
+ck "scope: the rails are marked UNSURFACED in their headers" 'grep -q "UNSURFACED" "$S/vt-scope-promote.sh" && grep -q "UNSURFACED" "$S/vt-scope-lib.sh"'
+# ── locks 2-4: the docs must say what the code already does
+source "$S/vt-guard-lib.sh"
+ck "lock2: orientation deny says it covers the CODEBASE ONLY"     'vt_gate_directive | grep -q "CODEBASE ONLY"'
+ck "lock2: orientation deny says the board is NOT frozen"         'vt_gate_directive | grep -qi "capability-gated" && vt_gate_directive | grep -qi "never orientation-gated"'
+ck "lock2: /manage says a stale gate does not block it"           'grep -q "Stale orientation does not block .*/manage" "$SK/manage/SKILL.md"'
+ck "lock2: /sync says the same"                                   'grep -q "Stale orientation does not block .*/sync" "$SK/sync/SKILL.md"'
+ck "lock2: /week names the gate's real scope"                     'grep -q "gated product surfaces" "$SK/week/SKILL.md"'
+ck "lock3: read-only carve-out stated in week/today/board/sync"   'grep -qi "read-only rails are never gated" "$SK/week/SKILL.md" && grep -qi "read-only rails are never gated" "$SK/today/SKILL.md" && grep -qi "read-only rails are never gated" "$SK/sync/SKILL.md" && grep -q "read-only rail" "$SK/board/SKILL.md"'
+ck "lock3: the gate deny itself points at the read-only rails"    'vt_gate_directive | grep -q "vt-week --orient"'
+ck "lock4: last-slash-wins is documented as intentional"          'grep -q "LAST SLASH WINS" "$S/vt-guard-lib.sh" && grep -q "last slash wins" "$SK/manage/SKILL.md" && grep -q "last slash wins" "$SK/sync/SKILL.md"'
 
 echo "════ RESULT: $P passed, $F failed ════"
 [ "$F" -eq 0 ]

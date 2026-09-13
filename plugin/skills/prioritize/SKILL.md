@@ -7,7 +7,7 @@ user-invocable: true
 argument-hint: "[add|set|drop <ID|\"text\">… | done <ID>… | week add|set|drop … | lever <CAP-ID> <urgent|today|later> | since]"
 ---
 
-`/prioritize` is the **thin, focus-only escape** between orientations: re-point today or the week **without re-running `/week`**, check boxes, adjust store levers. The living priorities doc (`current-priorities.md` — Today + Week as `[ ]`/`[x]`) is the surface; the detached store is where new items land. It does **not** write board columns and does **not** promote capacity scope docs.
+`/prioritize` is the **thin, focus-only escape** between orientations: re-point today or the week **without re-running `/week`**, check boxes, adjust store levers. The living priorities doc (`current-priorities.md` — Today + Week as `[ ]`/`[x]`) is the surface; the detached store is where new items land. It does **not** write board columns.
 
 User-invoked only (`disable-model-invocation: true`) — the agent can't fire it on its own.
 

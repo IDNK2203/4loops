@@ -6,6 +6,13 @@
 #
 # Writes $VT_DIR/tasks/<PROJECT>/<CAP-ID>.md with capacity fields only.
 # Does NOT touch board.md. Requires store item state=active.
+#
+# UNSURFACED (v2.5 Packet 009b): Track B is dead and the `/scope` skill was
+# removed, so nothing in the product routes here. The rail still works and
+# still carries its bash-gate tier; it is a bare power-user hatch, reachable
+# only from a session that already holds a capability from another
+# /4loops:* command. Scope docs under .4loops/tasks/ still never expire —
+# delete them by hand.
 # Marks store item scoped_at + scope_doc (state stays active).
 #
 # v2.5 Track B · Scope

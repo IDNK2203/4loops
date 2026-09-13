@@ -115,6 +115,14 @@ vt_gc_markers() {
 # Only the named product surfaces are gated; everything else is allowed. The
 # exempt list is a HARD always-allow (even if config widens the gated set), so
 # the ritual can never block itself and exploration/research is never blocked.
+#
+# SCOPE OF THE ORIENTATION GATE (locked by Ese 2026-09-13, v2.5 Packet 009b):
+# stale orientation blocks EXACTLY these gated product surfaces, via Edit/Write
+# (vt-gate.sh) and their shell equivalents (vt-bash-gate.sh). It does NOT gate
+# the board. Board/store mutation is guarded by a different, unrelated check —
+# the per-session rail capability (vt_cap_allows, below) — and .4loops/ is on
+# the exempt list, so a session holding a capability may drive the board rails
+# whether or not orientation is fresh. Do not couple the two.
 
 # Exempt = always writable, even gate-up.
 vt_is_exempt() {
@@ -141,10 +149,22 @@ vt_is_exempt() {
 # Build + Share. Overridable per workspace via .4loops/config (`gated: <glob>`
 # lines) — config may narrow/widen but the exempt list above always wins.
 vt_gated_globs() {
-  local cfg="$VT_DIR/config" globs=""
+  local cfg="$VT_DIR/config" globs="" noglob_was_off=0
   [ -f "$cfg" ] && globs=$(awk -F': *' '/^gated:/ {print $2}' "$cfg" 2>/dev/null)
   if [ -n "$globs" ]; then
+    # A configured `gated: web-app/*` is a PATTERN, not a directory listing.
+    # Unquoted $globs gets word-splitting (wanted: several globs on one line)
+    # AND pathname expansion (NOT wanted: `web-app/*` becomes web-app/README.md,
+    # web-app/src, … against the guard's cwd, so web-app/src/components/x.jsx
+    # matched nothing and the orientation gate silently stopped gating nested
+    # product files — v2.5 Packet 009b dogfood). `set -f` keeps the splitting
+    # and kills the expansion; restore the caller's flag either way.
+    case "$-" in *f*) : ;; *) noglob_was_off=1 ;; esac
+    set -f
+    # shellcheck disable=SC2086  # intentional split-only expansion (noglob is on)
     printf '%s\n' $globs
+    [ "$noglob_was_off" = 1 ] && set +f
+    return 0
   else
     printf '%s\n' "projects/*/repo-scaffolding/*" "projects/*/content/*" "projects/*/gists/*"
   fi
@@ -202,6 +222,13 @@ vt_record_deny_reason() {
 # bash-gate then allows a rail-script invocation only if a fresh grant covers it.
 # The token file is a W4 rail-record (above) so the agent can't forge it by writing.
 # Session-scoped, matching /sync's "standing consent for this working session".
+#
+# ONE capability per session, LAST SLASH WINS — intentional, locked by Ese
+# 2026-09-13 (v2.5 Packet 009b). Typing /4loops:week and then /4loops:manage
+# leaves the session holding `manage`, and the `week` grant is gone: the second
+# command is the user's current intent, and accumulating grants would let a
+# long session quietly collect every capability it ever touched. Re-type the
+# ritual's own slash command to get its grant back. Do NOT make these additive.
 vt_cap_dir()  { printf '%s' "$VT_DIR/.cap"; }
 vt_cap_file() { printf '%s' "$VT_DIR/.cap/$1"; }   # $1 = session_id
 
@@ -282,8 +309,11 @@ vt_cap_allows() {
     gateclear-today) [ "$cap" = "today" ] && return 0 || return 1 ;;
     gateclear-week)  [ "$cap" = "week" ]  && return 0 || return 1 ;;
     mutate)
+      # The shipped slash skills, exactly. `scope` was dropped with the /scope
+      # skill (Track B is dead — v2.5 Packet 009b); no capability can be minted
+      # for a command that no longer exists, so listing it would only be stale.
       case "$cap" in
-        sync|today|week|capture|scope|manage|prioritize|configure) return 0 ;;
+        sync|today|week|capture|manage|prioritize|configure) return 0 ;;
       esac
       return 1 ;;
   esac
@@ -313,7 +343,7 @@ vt_gate_directive() {
   else
     lead="Today's priorities are stale — run /4loops:week: one shot (look back since yesterday, refresh the week if needed, pull today's 2–3 from it). That single flow lifts the gate."
   fi
-  printf '%s' "4loops ORIENTATION GATE — orientation stale (this is the stale-priorities gate, NOT the rail-capability bash-gate). ${lead} This is orientation, not board churn: no state moves are required to lift it. STOP here — do NOT edit this gated surface, and do NOT work around the gate yourself (no override, no shelling out, no alternate tool). You cannot orient for the user: the rituals are user-invoked by design. Surface this, ask them to run the command above, and wait — that orientation IS their priority-setting and it lifts the gate. Reading, search, and notes (.4loops/, study/, learnings/, inbox/) are never blocked, so do whatever non-gated work you can meanwhile. Bypassing is the USER's decision alone — only if THEY explicitly tell you to (it's logged)."
+  printf '%s' "4loops ORIENTATION GATE — orientation stale (this is the stale-priorities gate, NOT the rail-capability bash-gate). ${lead} This is orientation, not board churn: no state moves are required to lift it. STOP here — do NOT edit this gated surface, and do NOT work around the gate yourself (no override, no shelling out, no alternate tool). You cannot orient for the user: the rituals are user-invoked by design. Surface this, ask them to run the command above, and wait — that orientation IS their priority-setting and it lifts the gate. This gate covers the CODEBASE ONLY — the configured gated product surfaces. It does not freeze the board: the board rails are capability-gated (a user-typed /4loops:sync or /4loops:manage), never orientation-gated, so with that capability you can still move state, capture, and re-prioritise while orientation is stale. Reading, search, notes (.4loops/, study/, learnings/, inbox/) and every read-only rail (vt-render / vt-drift / vt-store-list / vt-week --orient / vt-today --orient) are never blocked, so do whatever non-gated work you can meanwhile. Bypassing is the USER's decision alone — only if THEY explicitly tell you to (it's logged)."
 }
 
 # Emit a PreToolUse deny. Canonical = exit 0 + hookSpecificOutput JSON; falls

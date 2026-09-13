@@ -102,5 +102,13 @@ The column disappears once it is empty, and the board re-renders in its four act
 - **Operate, never simulate.** Every change runs a `vt-*.sh` rail and re-renders from disk; the
   board file is the proof. You cannot hand-edit `board.md` — the gate blocks it.
 - `/manage` does **not** lift the daily/weekly gate — that's `/week`. It only works the board.
+- **Stale orientation does not block `/manage`.** The two gates are unrelated: the orientation gate
+  covers writes to the **gated product surfaces** (the codebase), while the board rails are guarded
+  by the per-session **capability** minted when the user types `/4loops:manage`. With that
+  capability you may move state, edit, merge, remove, flush and rename **even when priorities are
+  stale** — nudge the user toward `/week`, but do not refuse the work or claim the board is frozen.
+- **One capability per session, last slash wins** (intentional). Typing another `/4loops:*` command
+  replaces this one; grants do not accumulate. If a later command takes the session's capability,
+  ask the user to re-type `/4loops:manage` rather than working around the deny.
 - `backlog` is not a valid transition target any more. Park uncommitted work in the store; retire
   dead work with `abandoned`.

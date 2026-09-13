@@ -1,5 +1,12 @@
 #!/usr/bin/env bash
 # vt-scope-read.sh <CAP-ID|path> — print a scope doc (read-only).
+#
+# UNSURFACED (v2.5 Packet 009b): Track B is dead and the `/scope` skill was
+# removed, so nothing in the product routes here. The rail still works and
+# still carries its bash-gate tier; it is a bare power-user hatch, reachable
+# only from a session that already holds a capability from another
+# /4loops:* command. Scope docs under .4loops/tasks/ still never expire —
+# delete them by hand.
 set -euo pipefail
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"

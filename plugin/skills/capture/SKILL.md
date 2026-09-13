@@ -95,7 +95,7 @@ Show the preview to the user as you create — if they immediately object, items
 
 ### 4. Hand priority cadence back
 
-Every item lands in the **detached store** with its lever. Do **not** draft onto the board — tell the user to change levers / pull into today's focus via `/prioritize` (or `/sync`). Priority stays the operator's. Capacity scope-doc promote (`/scope`) is **parked** — not the product path.
+Every item lands in the **detached store** with its lever. Do **not** draft onto the board — tell the user to change levers / pull into today's focus via `/prioritize` (or `/sync`). Priority stays the operator's. There is no scope-doc step — Track B is dead and its skill was removed (v2.5 Packet 009b).
 
 ## Notes
 
