@@ -8,7 +8,8 @@
 # in the right place. Residual blind spots (fail-open): glob/quoted args, mid-
 # command cd chains & subshells, and arbitrary-code writers (python -c, node -e).
 #
-# FAIL-OPEN: any error → allow.
+# FAIL-OPEN: any error → allow. Also fails open wholesale while the workspace is
+# opted out (.4loops/disabled — v2.5 Packet 010).
 set -uo pipefail
 
 HOOK_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
@@ -21,6 +22,17 @@ cmd=$(vt_json_field "$input" '.tool_input.command')
 [ -z "$cmd" ] && exit 0
 sid=$(vt_json_field "$input" '.session_id')
 cwd=$(vt_json_field "$input" '.cwd')
+
+# ── v2.5 Packet 010 (Surround): workspace opt-out ────────────────────────────
+# If .4loops/disabled is present the whole hook steps aside — capability check,
+# record protection and orientation gate alike. Resolved from cwd here (the
+# common case); a target that lives in a DIFFERENT, opted-out workspace is
+# caught again per-target in the loop below.
+dis_root=$(vt_find_workspace_root "${cwd:-$PWD}") || dis_root=""
+if [ -n "$dis_root" ]; then
+  export VT_DIR="$dis_root/.4loops"
+  vt_is_disabled && exit 0
+fi
 
 # Overrides are honored ONLY from the hook's inherited environment — i.e. the USER's
 # shell at launch (`VT_ALLOW_STALE_GATE=1 claude …`). We deliberately do NOT parse them
@@ -54,7 +66,8 @@ if [ -n "$caprails" ] && [ "$rail_override" = "0" ]; then
       cap=$(vt_read_cap "$sid")
       while IFS= read -r rname; do
         [ -z "$rname" ] && continue
-        vt_cap_allows "$cap" "$(vt_rail_tier_for "$rname" "$cmd")" || vt_emit_deny "$(vt_cap_deny_reason)"
+        rtier=$(vt_rail_tier_for "$rname" "$cmd")
+        vt_cap_allows "$cap" "$rtier" || vt_emit_deny "$(vt_cap_deny_reason "$rtier")"
       done <<EOF
 $caprails
 EOF
@@ -109,6 +122,7 @@ while IFS= read -r t; do
   root=$(vt_find_workspace_root "$abs") || continue
   [ -z "$root" ] && continue
   export VT_DIR="$root/.4loops"
+  vt_is_disabled && continue          # Packet 010: that workspace is opted out
   # shellcheck source=../scripts/vt-priorities-lib.sh
   source "$SCRIPTS_DIR/vt-priorities-lib.sh" 2>/dev/null || continue
   # W4: rail-owned records are user-only — block direct hand-edits (any state).

@@ -63,6 +63,28 @@ vt_resolve_abs() {
 vt_rail_armed() { [ -f "$VT_DIR/.armed" ]; }
 vt_arm_rail()   { : > "$VT_DIR/.armed" 2>/dev/null || true; }
 
+# ── Workspace opt-out (v2.5 Packet 010: Surround) ─────────────────────────────
+# `.4loops/disabled` is this workspace's FULL opt-out of 4loops enforcement. While
+# the flag exists every hook steps aside: the orientation gate (C), the rail
+# capability check (B1), the rail-owned record protection (B2) and the prompt
+# nudge. Full opt-out is deliberate (Surround plan, decision for build) — a
+# half-disabled rail that still refused a board hand-edit would be worse than
+# either honest state.
+#
+# ORDERING IS LOAD-BEARING: every hook must test vt_is_disabled BEFORE its
+# record check, or the opt-out would still block hand-edits of board.md.
+#
+# The flag is itself a B2 rail-record (vt_is_rail_record, below), so the AGENT
+# cannot create it with an Edit/Write or a shell redirect and thereby switch off
+# its own gate. The only ways in are the user-invoked `/4loops:disable` skill —
+# which mints the `disable` capability that vt-disable.sh's `on` mode requires —
+# and the user's own hands outside Claude. Opting out is the USER's call alone.
+#
+# Opting out DELETES NOTHING: board.md, current-priorities.md, store/ and
+# archive/ survive untouched, so re-enabling resumes the same board.
+vt_is_disabled()   { [ -f "$VT_DIR/disabled" ]; }
+vt_disable_flag()  { printf '%s' "$VT_DIR/disabled"; }
+
 # ── Per-session clearance (carries across midnight + resume) ──────────────────
 # A session that has seen the gate clear (ran the ritual, or started/acted on a
 # fresh day) is marked; it is NEVER re-blocked for its lifetime, even past
@@ -199,6 +221,7 @@ vt_is_rail_record() {
     */.4loops/.cap/*|.4loops/.cap/*)                     return 0 ;;  # W4+ (v2.4): capability tokens are hook-written, agent-unwritable
     */.4loops/store/*|.4loops/store/*)                   return 0 ;;  # v2.5 Track A: detached backlog store is rail-owned
     */.4loops/tasks/*|.4loops/tasks/*)                   return 0 ;;  # v2.5 Track B: ephemeral scope docs are rail-owned
+    */.4loops/disabled|.4loops/disabled)                 return 0 ;;  # v2.5 Packet 010: the opt-out flag is rail-written — an agent-writable flag would be an agent-disablable gate
   esac
   return 1
 }
@@ -263,6 +286,11 @@ vt_rail_tier() {
     vt-transition|vt-priority|vt-draft|vt-arrange|vt-close|vt-repack|vt-refresh-counts|vt-gc|vt-init|vt-config|vt-store-capture|vt-store-expire|vt-store-lever|vt-scope-promote) printf 'mutate' ;;
     # v2.5 Track D — board lifecycle writers (task CRUD, Done flush, key ops, migration)
     vt-edit|vt-merge|vt-remove|vt-flush|vt-key|vt-migrate-backlog) printf 'mutate' ;;
+    # v2.5 Packet 010 — Surround: the workspace opt-out is its OWN tier, not
+    # `mutate`. Typing /4loops:disable should buy exactly one thing (the opt-out
+    # flag) and must not hand the session the board rails as a side effect; and
+    # conversely a /4loops:sync grant must not be able to switch the rail off.
+    vt-disable) printf 'optout' ;;
     vt-render|vt-drift|vt-next-id|vt-detect|vt-store-list|vt-scope-list|vt-scope-read) printf 'readonly' ;;
     *) printf '' ;;
   esac
@@ -282,6 +310,7 @@ vt_rail_readonly_modes() {
   case "$1" in
     vt-week)  printf 'orient|default|current|print' ;;
     vt-today) printf 'orient|default|current|yesterday|print' ;;
+    vt-disable) printf 'status' ;;
     *)        printf '' ;;
   esac
 }
@@ -308,6 +337,9 @@ vt_cap_allows() {
     ''|readonly)     return 0 ;;                                  # not ours / read-only → allow
     gateclear-today) [ "$cap" = "today" ] && return 0 || return 1 ;;
     gateclear-week)  [ "$cap" = "week" ]  && return 0 || return 1 ;;
+    # v2.5 Packet 010: only the opt-out command itself. Deliberately NOT part of
+    # the `mutate` set below — see vt_rail_tier.
+    optout)          [ "$cap" = "disable" ] && return 0 || return 1 ;;
     mutate)
       # The shipped slash skills, exactly. `scope` was dropped with the /scope
       # skill (Track B is dead — v2.5 Packet 009b); no capability can be minted
@@ -320,8 +352,15 @@ vt_cap_allows() {
   return 1
 }
 
-# Deny directive for a bare rail invocation lacking capability.
+# Deny directive for a bare rail invocation lacking capability. $1 = the rail's
+# tier (optional): the opt-out rail gets its own copy, because "you have no
+# capability for a mutating rail" would be a confusing thing to say about a
+# command whose whole job is to switch the rail OFF.
 vt_cap_deny_reason() {
+  if [ "${1:-}" = "optout" ]; then
+    printf '%s' "4loops BASH-GATE (workspace opt-out — NOT the orientation gate): switching 4loops enforcement off for this workspace is the USER's decision alone, so vt-disable.sh on|off needs a capability minted by the user typing /4loops:disable. Nothing is stale and nothing is broken — you simply were not handed the opt-out. If the rail is in the user's way, say so and suggest THEY run /4loops:disable (it writes .4loops/disabled, deletes no board/store/priorities data, and is undone with rm .4loops/disabled). Do NOT create .4loops/disabled yourself and do NOT work around the gate — an agent that can disable its own gate has no gate. vt-disable.sh --status is read-only and never blocked, so you may always check whether the rail is on."
+    return 0
+  fi
   printf '%s' "4loops BASH-GATE (rail capability — NOT the orientation gate, and NOT a refusal to help): this session has no capability for a mutating vt-*.sh rail. Rails are operator-invoked: a capability is minted only when the USER types a /4loops:<cmd> slash command, and it covers that session. Nothing is stale and no ritual is overdue — you simply were not handed the rail. To move the board, ask the operator to run /4loops:sync (then just say what changed); to orient, /4loops:week (one shot). Do NOT call mutating rail scripts yourself and do NOT work around this. Read-only rails (vt-render / vt-drift / vt-store-list / vt-week --orient|--print / vt-today --orient|--print|--current|--yesterday) are NEVER blocked — run those freely to answer questions."
 }
 

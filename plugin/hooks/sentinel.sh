@@ -28,6 +28,28 @@ source "$SCRIPT_DIR/../scripts/vt-board-lib.sh"
 # If this workspace doesn't use 4loops, exit silently — don't pollute context.
 [ ! -d "$VT_DIR" ] && exit 0
 
+# v2.5 Packet 010 (Surround): the workspace is opted out. Say so once per session
+# and do nothing else — no rollover, no gate clearing, no GC. The notice is
+# deliberate: a rail that is silently off forever is worse than one that tells you
+# it's off and how to switch it back on.
+if vt_is_disabled; then
+  nl=$'\n'
+  DIS=" ╭◎ ◎╮  4loops · $(basename "$(pwd)")${nl}"
+  DIS="${DIS} ╰─▿─╯  disabled — enforcement OFF for this workspace${nl}${nl}"
+  DIS="${DIS}.4loops/disabled is present, so the orientation gate, the rail-capability${nl}"
+  DIS="${DIS}bash-gate and the prompt nudge all step aside. Your board, priorities,${nl}"
+  DIS="${DIS}store and archive are untouched.${nl}${nl}"
+  DIS="${DIS}Re-enable: rm .4loops/disabled   (or /4loops:disable off)${nl}"
+  DIS="${DIS}Command map: /4loops:help${nl}"
+  if command -v jq >/dev/null 2>&1; then
+    jq -n --arg ctx "$DIS" --arg msg "${nl}${DIS}" \
+      '{hookSpecificOutput: {hookEventName: "SessionStart", additionalContext: $ctx}, systemMessage: $msg}'
+  else
+    printf '%s\n' "$DIS"
+  fi
+  exit 0
+fi
+
 # Read the SessionStart payload; session_id drives gate session-clearing.
 HOOK_INPUT=$(cat 2>/dev/null || printf '{}')
 SID=$(vt_json_field "$HOOK_INPUT" '.session_id')

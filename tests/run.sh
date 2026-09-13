@@ -1070,7 +1070,9 @@ ck "week skill: no AskUserQuestion is described before Step 1"       '[ "$(sed -
 ck "today skill: same rule, no question-skip past the print"         'grep -q "This step is unconditional" "$SK/today/SKILL.md" && ! grep -q "skip the question and go straight to Step 2" "$SK/today/SKILL.md"'
 ck "sync skill: orient prints are unconditional too"                 'grep -q "prints above are unconditional" "$SK/sync/SKILL.md" && ! grep -q "skip straight to step 2 and act on it" "$SK/sync/SKILL.md"'
 # ── invocation-matrix invariants: the SoT table must stay true of the code
-ck "matrix: board is the ONLY model-invokable skill"                 '[ "$(grep -L "disable-model-invocation: true" "$SK"/*/SKILL.md)" = "$SK/board/SKILL.md" ]'
+# Packet 010: `help` joins `board` as model-invokable (read-only discoverability).
+# Every OTHER skill must keep disable-model-invocation — that is Gate A.
+ck "matrix: board + help are the ONLY model-invokable skills"        '[ "$(grep -L "disable-model-invocation: true" "$SK"/*/SKILL.md | sort | tr "\n" " ")" = "$SK/board/SKILL.md $SK/help/SKILL.md " ]'
 ck "matrix: every skill is user-invocable"                           '[ "$(grep -l "^user-invocable: true$" "$SK"/*/SKILL.md | wc -l | tr -d " ")" = "$(ls -d "$SK"/*/ | wc -l | tr -d " ")" ]'
 # No rail may fall through vt_rail_tier: an unclassified vt-*.sh is a fail-open
 # hole in the bash gate (empty tier → allowed with no capability).
@@ -1093,7 +1095,7 @@ ck "tier: vt-week --yesterday is NOT readonly (the rail has no such mode)"  '[ "
 ck "tier: vt-today --yesterday IS readonly (that rail does have it)"        '[ "$(bash -c "source \"$S/vt-guard-lib.sh\"; vt_rail_tier_for vt-today \"$S/vt-today.sh --yesterday\"")" = "readonly" ]'
 ck "tier: a readonly mode glued to more args is not readonly"               '[ "$(bash -c "source \"$S/vt-guard-lib.sh\"; vt_rail_tier_for vt-week \"$S/vt-week.sh --orientX\"")" = "gateclear-week" ]'
 ck "tier: every declared readonly mode is one the rail really dispatches"   'bash -c "source \"$S/vt-guard-lib.sh\"
-  for r in vt-week vt-today; do
+  for r in vt-week vt-today vt-disable; do
     IFS=\"|\" read -ra ms <<< \"\$(vt_rail_readonly_modes \$r)\"
     for m in \"\${ms[@]}\"; do grep -q -- \"^  --\$m)\" \"$S/\$r.sh\" || exit 1; done
   done; exit 0"'
@@ -1154,7 +1156,7 @@ ck "globs: caller's noglob flag is left as it was" 'bash -c "source \"$S/vt-guar
 rm -rf "$W32"
 # ── /scope is gone (Track B dead — Ese lock 2026-09-13)
 ck "scope: the skill directory is removed"                   '[ ! -d "$SK/scope" ]'
-ck "scope: eight skills ship (was nine)"                     '[ "$(ls -d "$SK"/*/ | wc -l | tr -d " ")" = "8" ]'
+ck "scope: ten skills ship (eight + help + disable)"         '[ "$(ls -d "$SK"/*/ | wc -l | tr -d " ")" = "10" ]'
 ck "scope: no skill still points the user at /scope"         '! grep -rn "4loops:scope\|\`/scope\`" "$SK" >/dev/null 2>&1'
 ck "scope: no capability named scope unlocks anything"       'bash -c "source \"$S/vt-guard-lib.sh\"; ! vt_cap_allows scope mutate && ! vt_cap_allows scope gateclear-week && ! vt_cap_allows scope gateclear-today"'
 ck "scope: the rails survive and keep their tiers"           'bash -c "source \"$S/vt-guard-lib.sh\"; [ \"\$(vt_rail_tier vt-scope-promote)\" = mutate ] && [ \"\$(vt_rail_tier vt-scope-list)\" = readonly ]"'
@@ -1169,6 +1171,120 @@ ck "lock2: /week names the gate's real scope"                     'grep -q "gate
 ck "lock3: read-only carve-out stated in week/today/board/sync"   'grep -qi "read-only rails are never gated" "$SK/week/SKILL.md" && grep -qi "read-only rails are never gated" "$SK/today/SKILL.md" && grep -qi "read-only rails are never gated" "$SK/sync/SKILL.md" && grep -q "read-only rail" "$SK/board/SKILL.md"'
 ck "lock3: the gate deny itself points at the read-only rails"    'vt_gate_directive | grep -q "vt-week --orient"'
 ck "lock4: last-slash-wins is documented as intentional"          'grep -q "LAST SLASH WINS" "$S/vt-guard-lib.sh" && grep -q "last slash wins" "$SK/manage/SKILL.md" && grep -q "last slash wins" "$SK/sync/SKILL.md"'
+
+echo "════ 33. v2.5 Packet 010: Surround — help + disable · the opt-out fails every hook open ════"
+SK="$PLUGIN/skills"
+# ── the flag predicate + what it must NOT let the agent do
+W33=$(mktemp -d); VT="$W33/.4loops"; mkboard "$VT"; : > "$VT/.armed"; : > "$VT/transitions.log"
+mkdir -p "$W33/projects/p0/content" "$VT/store/items"
+dis(){ bash -c "export VT_DIR=\"$VT\"; source \"$S/vt-guard-lib.sh\"; $1"; }
+ck "flag: vt_is_disabled is false with no .4loops/disabled"   '! dis "vt_is_disabled"'
+: > "$VT/disabled"
+ck "flag: vt_is_disabled is true once the flag exists"        'dis "vt_is_disabled"'
+ck "flag: vt_disable_flag names .4loops/disabled"             '[ "$(dis "vt_disable_flag")" = "$VT/disabled" ]'
+rm -f "$VT/disabled"
+# The flag is a rail-record: an agent that could Write it could switch off its own gate.
+ck "flag: .4loops/disabled is a rail-owned record"            'dis "vt_is_rail_record \"$VT/disabled\""'
+ck "flag: the rest of .4loops/ is still exempt, not a record" '! dis "vt_is_rail_record \"$VT/notes.txt\""'
+
+# ── tiers + capability: the opt-out is its own tier, reachable only from /4loops:disable
+ck "tier: vt-disable is tier optout (not mutate)"             '[ "$(dis "vt_rail_tier vt-disable")" = "optout" ]'
+ck "tier: --status is readonly (a status read is never gated)" '[ "$(dis "vt_rail_tier_for vt-disable \"$S/vt-disable.sh --status\"")" = "readonly" ]'
+ck "tier: --on keeps the optout tier"                         '[ "$(dis "vt_rail_tier_for vt-disable \"$S/vt-disable.sh --on\"")" = "optout" ]'
+ck "cap: only the disable capability unlocks optout"          'dis "vt_cap_allows disable optout"'
+ck "cap: a capability-less session cannot opt out"            '! dis "vt_cap_allows \"\" optout"'
+ck "cap: sync/manage/week grants do NOT unlock optout"        '! dis "vt_cap_allows sync optout" && ! dis "vt_cap_allows manage optout" && ! dis "vt_cap_allows week optout"'
+ck "cap: the disable grant does NOT hand over the board rails" '! dis "vt_cap_allows disable mutate" && ! dis "vt_cap_allows disable gateclear-week" && ! dis "vt_cap_allows disable gateclear-today"'
+ck "cap: the disable grant still allows read-only rails"      'dis "vt_cap_allows disable readonly"'
+ck "cap: /4loops:help mints a readonly-only grant (like /board)" 'dis "vt_cap_allows help readonly" && ! dis "vt_cap_allows help mutate" && ! dis "vt_cap_allows help optout"'
+ck "deny copy: the optout deny names /4loops:disable + is not the orientation gate" \
+   'dis "vt_cap_deny_reason optout" | grep -q "/4loops:disable" && dis "vt_cap_deny_reason optout" | grep -q "NOT the orientation gate"'
+ck "deny copy: the optout deny forbids creating the flag by hand" 'dis "vt_cap_deny_reason optout" | grep -q "Do NOT create .4loops/disabled yourself"'
+ck "deny copy: the plain capability deny is unchanged"        'dis "vt_cap_deny_reason" | grep -q "BASH-GATE (rail capability"'
+
+# ── the rail itself
+# NOTE: no `grep -q` on a live pipe here. The suite runs under `set -o pipefail`,
+# and `grep -q` exits the moment it matches — the rail is then killed by SIGPIPE
+# mid-print and the pipeline reports 141. Plain `grep >/dev/null` drains stdin.
+R33(){ VT_DIR="$VT" bash "$S/vt-disable.sh" "$@" 2>&1; }
+rgrep(){ R33 "$1" | grep "$2" >/dev/null 2>&1; }
+ck "rail: --status reports ENABLED before any opt-out"        'rgrep --status "4loops: ENABLED"'
+ck "rail: --on writes the flag and says what is off"          'rgrep --on "DISABLED — wrote" && [ -f "$VT/disabled" ]'
+ck "rail: the flag is stamped (status prints a since: line)"  'rgrep --status "^since:  disabled "'
+ck "rail: --on twice is idempotent, not an error"             'rgrep --on "already DISABLED"'
+ck "rail: --on deletes no board / priorities / store data"    '[ -f "$VT/board.md" ] && [ -f "$VT/transitions.log" ] && [ -d "$VT/store/items" ]'
+ck "rail: --status says how to re-enable"                     'rgrep --status "re-enable: rm "'
+ck "rail: --off removes the flag"                             'rgrep --off "ENABLED — removed" && [ ! -f "$VT/disabled" ]'
+ck "rail: --off twice is idempotent"                          'rgrep --off "already ENABLED"'
+ck "rail: bare on/off/status aliases work too"                'rgrep status "ENABLED" && rgrep on "DISABLED" && rgrep off "ENABLED"'
+VT_DIR="$VT" bash "$S/vt-disable.sh" --bogus >/dev/null 2>/tmp/vt33-bogus.txt; DB_RC=$?
+ck "rail: an unknown mode exits 2 and creates nothing"        '[ "'"$DB_RC"'" = "2" ] && grep -q "has no --bogus mode" /tmp/vt33-bogus.txt && [ ! -f "$VT/disabled" ]'
+
+# ── the gates fail OPEN while disabled, and DENY again once re-enabled
+pj33(){ printf '{"session_id":"%s","cwd":"%s","tool_input":{"file_path":"%s"}}' "$1" "$W33" "$2"; }
+g33(){ printf '%s' "$1" | bash "$H/vt-gate.sh" 2>&1; }
+bj33(){ printf '{"session_id":"%s","cwd":"%s","tool_input":{"command":"%s"}}' "$1" "$W33" "$2"; }
+b33(){ printf '%s' "$1" | bash "$H/vt-bash-gate.sh" 2>&1; }
+GATED="$W33/projects/p0/content/a.md"
+# enabled + stale + gated → deny (the baseline this packet must not break)
+ck "gate: ENABLED + stale + gated product file is still DENIED"      'O=$(g33 "$(pj33 D1 "$GATED")"); isdeny "$O"'
+ck "bash-gate: ENABLED + stale + gated shell write is DENIED"        'O=$(b33 "$(bj33 D1 "echo x > $GATED")"); isdeny "$O"'
+ck "bash-gate: ENABLED + a mutate rail with no capability is DENIED" 'O=$(b33 "$(bj33 D1 "bash $S/vt-transition.sh P0-1 done")"); isdeny "$O"'
+ck "gate: ENABLED + writing .4loops/disabled BY HAND is DENIED (an agent cannot disable its own gate)" \
+   'O=$(g33 "$(pj33 D1 "$VT/disabled")"); isdeny "$O" && printf "%s" "$O" | grep -q "rail-owned record"'
+ck "bash-gate: ENABLED + shelling the flag into place is DENIED too" \
+   'O=$(b33 "$(bj33 D1 "touch $VT/disabled")"); isdeny "$O"'
+ck "bash-gate: ENABLED + vt-disable.sh --on with no capability is DENIED, naming the opt-out" \
+   'O=$(b33 "$(bj33 D1 "bash $S/vt-disable.sh --on")"); isdeny "$O" && printf "%s" "$O" | grep -q "workspace opt-out"'
+ck "bash-gate: ENABLED + vt-disable.sh --status needs no capability" \
+   'O=$(b33 "$(bj33 D1 "bash $S/vt-disable.sh --status")"); ! isdeny "$O"'
+# now opt out — every check must step aside
+: > "$VT/disabled"
+ck "gate: DISABLED + stale + gated product file is ALLOWED"     'O=$(g33 "$(pj33 D2 "$GATED")"); ! isdeny "$O"'
+ck "bash-gate: DISABLED + stale + gated shell write is ALLOWED" 'O=$(b33 "$(bj33 D2 "echo x > $GATED")"); ! isdeny "$O"'
+ck "gate: DISABLED + a board.md hand-edit is ALLOWED (full opt-out, incl. rail records)" \
+   'O=$(g33 "$(pj33 D2 "$VT/board.md")"); ! isdeny "$O"'
+ck "bash-gate: DISABLED + a store hand-edit is ALLOWED too"     'O=$(b33 "$(bj33 D2 "echo x > $VT/store/items/CAP-001.md")"); ! isdeny "$O"'
+ck "bash-gate: DISABLED + a mutate rail with no capability is ALLOWED" \
+   'O=$(b33 "$(bj33 D2 "bash $S/vt-transition.sh P0-1 done")"); ! isdeny "$O"'
+ck "bash-gate: DISABLED + removing the flag is ALLOWED (re-enabling is never blocked)" \
+   'O=$(b33 "$(bj33 D2 "rm $VT/disabled")"); ! isdeny "$O"'
+ck "prompt-gate: DISABLED injects no nudge and leaves no marker" \
+   'O=$(printf "{\"session_id\":\"D3\",\"cwd\":\"%s\"}" "$W33" | bash "$H/vt-prompt-gate.sh" 2>&1); [ -z "$O" ] && [ -z "$(find "$VT" -maxdepth 1 -name ".prompt-nudged-*" 2>/dev/null)" ]'
+ck "sentinel: DISABLED prints the notice + the re-enable line, and no stale dashboard" \
+   'O=$(cd "$W33" && printf "{\"session_id\":\"D3\"}" | VT_DIR="$VT" bash "$H/sentinel.sh" 2>&1); printf "%s" "$O" | grep -q "disabled — enforcement OFF" && printf "%s" "$O" | grep -q "rm .4loops/disabled" && ! printf "%s" "$O" | grep -q "STALE"'
+# re-enable → the gate comes straight back (priorities are still stale)
+rm -f "$VT/disabled"
+ck "gate: RE-ENABLED + still-stale priorities → the deny returns"  'O=$(g33 "$(pj33 D4 "$GATED")"); isdeny "$O" && printf "%s" "$O" | grep -q "ORIENTATION GATE"'
+ck "bash-gate: RE-ENABLED + no capability → the rail deny returns" 'O=$(b33 "$(bj33 D4 "bash $S/vt-transition.sh P0-1 done")"); isdeny "$O"'
+ck "prompt-gate: RE-ENABLED nudges again"                          'O=$(printf "{\"session_id\":\"D5\",\"cwd\":\"%s\"}" "$W33" | bash "$H/vt-prompt-gate.sh" 2>&1); printf "%s" "$O" | grep -q "4loops ORIENTATION GATE"'
+# a DIFFERENT workspace being opted out must not leak into this one
+W33B=$(mktemp -d); mkboard "$W33B/.4loops"; : > "$W33B/.4loops/.armed"; : > "$W33B/.4loops/disabled"
+mkdir -p "$W33B/projects/p0/content"
+ck "scope: the flag is per-workspace — a disabled neighbour does not unlock this one" \
+   'O=$(g33 "$(pj33 D6 "$GATED")"); isdeny "$O"'
+ck "scope: and the disabled neighbour IS open (same hook, its own cwd)" \
+   'O=$(printf "{\"session_id\":\"D6\",\"cwd\":\"%s\",\"tool_input\":{\"file_path\":\"%s\"}}" "$W33B" "$W33B/projects/p0/content/a.md" | bash "$H/vt-gate.sh" 2>&1); ! isdeny "$O"'
+rm -rf "$W33B"
+
+# ── the two new skills
+ck "help skill: ships"                                  '[ -f "$SK/help/SKILL.md" ]'
+ck "help skill: is model-invokable (no Gate A flag)"    '! grep -q "disable-model-invocation" "$SK/help/SKILL.md"'
+ck "help skill: is user-invocable too"                  'grep -q "^user-invocable: true$" "$SK/help/SKILL.md"'
+ck "help skill: prints the command map, /week first"    'grep -q "4loops:week" "$SK/help/SKILL.md" && grep -q "Type this every morning" "$SK/help/SKILL.md"'
+ck "help skill: carries the two-gates lines"            'grep -q "^## The two gates" "$SK/help/SKILL.md" && grep -q "codebase) only" "$SK/help/SKILL.md" && grep -qi "Rail-capability bash-gate" "$SK/help/SKILL.md"'
+ck "help skill: names every shipped command"            'for c in week today prioritize sync board capture manage configure help disable; do grep -q "4loops:$c\`" "$SK/help/SKILL.md" || exit 1; done'
+ck "help skill: says it is read-only / mutates nothing" 'grep -q "^\*\*Read-only\.\*\*" "$SK/help/SKILL.md"'
+ck "help skill: states the read-only carve-out"         'grep -qi "read-only rail" "$SK/help/SKILL.md"'
+ck "disable skill: ships"                               '[ -f "$SK/disable/SKILL.md" ]'
+ck "disable skill: is user-invoked ONLY (Gate A)"       'grep -q "^disable-model-invocation: true$" "$SK/disable/SKILL.md" && grep -q "^user-invocable: true$" "$SK/disable/SKILL.md"'
+ck "disable skill: explains how to re-enable"           'grep -q "rm .4loops/disabled" "$SK/disable/SKILL.md" && grep -q "disable off" "$SK/disable/SKILL.md"'
+ck "disable skill: promises no data is wiped"           'grep -q "^## What stays" "$SK/disable/SKILL.md" && grep -q "\*\*Nothing is deleted\.\*\*" "$SK/disable/SKILL.md"'
+ck "disable skill: names all four checks it switches off" 'for k in "Orientation gate" "Rail capability" "Rail-record protection" "Prompt nudge"; do grep -q "$k" "$SK/disable/SKILL.md" || exit 1; done'
+ck "disable skill: drives the rail, not a hand-written flag" 'grep -q "scripts/vt-disable.sh" "$SK/disable/SKILL.md" && ! grep -q "touch .4loops/disabled" "$SK/disable/SKILL.md"'
+ck "disable skill: says the agent can never fire it"    'grep -q "agent can never fire this on its own" "$SK/disable/SKILL.md"'
+ck "surround: neither new skill points at the dead /scope" '! grep -n "4loops:scope" "$SK/help/SKILL.md" "$SK/disable/SKILL.md" >/dev/null 2>&1'
+unset VT_DIR; rm -rf "$W33"
 
 echo "════ RESULT: $P passed, $F failed ════"
 [ "$F" -eq 0 ]
